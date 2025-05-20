@@ -1,22 +1,61 @@
+'use client';
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const TMDB_ACCESS_TOKEN = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+
 export default function HomePage() {
-  const selectedMovie = "Interstellar"; // This will eventually come from the admin panel
-  const theaters = [
-    {
-      name: "AMC River East 21",
-      slots: ["6:00 PM", "7:30 PM", "9:00 PM"]
-    },
-    {
-      name: "Regal City North",
-      slots: ["5:45 PM", "8:15 PM"]
-    },
-    {
-      name: "Music Box Theatre",
-      slots: ["6:30 PM", "9:15 PM"]
+  const [selectedMovie, setSelectedMovie] = useState<string | null>(null);
+  const [posterPath, setPosterPath] = useState<string | null>(null);
+  const [showtimes, setShowtimes] = useState<{ theater: string; time: string }[]>([]);
+
+  useEffect(() => {
+    const movieId = localStorage.getItem("featuredMovieId");
+
+    if (movieId && TMDB_ACCESS_TOKEN) {
+      fetch(`https://api.themoviedb.org/3/movie/${movieId}?language=en-US`, {
+        headers: {
+          Authorization: `Bearer ${TMDB_ACCESS_TOKEN}`,
+          Accept: "application/json"
+        }
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.title) {
+            setSelectedMovie(data.title);
+            setPosterPath(data.poster_path);
+
+            // Fetch showtimes based on movie title
+            fetch(`/api/showtimes?q=${encodeURIComponent(data.title)}`)
+              .then((res) => res.json())
+              .then((showtimesData) => {
+                const parsed: { theater: string; time: string }[] = [];
+                // ✅ Corrected SerpAPI showtime parsing logic
+                showtimesData.forEach((entry: any) => {
+                  entry.theaters?.forEach((theater: any) => {
+                    theater.showing?.forEach((showing: any) => {
+                      showing.time?.forEach((time: string) => {
+                        parsed.push({
+                          theater: theater.name,
+                          time
+                        });
+                      });
+                    });
+                  });
+                });
+                setShowtimes(parsed);
+              })
+              .catch(() => setShowtimes([]));
+          } else {
+            setSelectedMovie("Unknown Movie");
+          }
+        })
+        .catch(() => setSelectedMovie("Error fetching movie"));
+    } else {
+      setSelectedMovie("Movie not set");
     }
-  ];
+  }, []);
 
   return (
     <main className="min-h-screen bg-zinc-900 text-white p-6">
@@ -26,13 +65,18 @@ export default function HomePage() {
       </header>
 
       <section className="max-w-3xl mx-auto">
-        {/* Admin Selected Movie Display */}
         <div className="mb-8 bg-zinc-800 p-6 rounded-xl shadow-lg text-center">
           <h2 className="text-2xl font-semibold mb-2">This Week's Movie</h2>
-          <p className="text-xl text-indigo-400">{selectedMovie}</p>
+          <p className="text-xl text-indigo-400 mb-4">{selectedMovie ?? "Loading..."}</p>
+          {posterPath && (
+            <img
+              src={`https://image.tmdb.org/t/p/w300${posterPath}`}
+              alt={selectedMovie ?? "Movie Poster"}
+              className="mx-auto rounded-lg shadow-md"
+            />
+          )}
         </div>
 
-        {/* Ranked Choice Theater Voting */}
         <div className="mb-8 bg-zinc-800 p-6 rounded-xl shadow-lg">
           <h2 className="text-2xl font-semibold mb-4">Vote for Showtimes</h2>
           <p className="text-zinc-400 mb-4">Select your top 3 theater + time combos in ranked order:</p>
@@ -45,12 +89,10 @@ export default function HomePage() {
                     <SelectValue placeholder="Select a showtime" />
                   </SelectTrigger>
                   <SelectContent>
-                    {theaters.map((theater) => (
-                      theater.slots.map((slot) => (
-                        <SelectItem key={`${theater.name}-${slot}`} value={`${theater.name} - ${slot}`}>
-                          {theater.name} — {slot}
-                        </SelectItem>
-                      ))
+                    {showtimes.map((entry, idx) => (
+                      <SelectItem key={`${entry.theater}-${entry.time}-${idx}`} value={`${entry.theater} - ${entry.time}`}>
+                        {entry.theater} — {entry.time}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -59,22 +101,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Group Voting Summary */}
-        <div className="mb-8 bg-zinc-800 p-6 rounded-xl shadow-lg">
-          <h2 className="text-2xl font-semibold mb-4">Friend Votes</h2>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span>Alice: #1 AMC River East 21 - 7:30 PM</span>
-              <span className="text-green-400">👍</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span>Bob: #1 Music Box Theatre - 9:15 PM</span>
-              <span className="text-green-400">👍</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Final Decision */}
         <div className="text-center">
           <Button className="text-lg">Confirm Movie Night</Button>
         </div>
