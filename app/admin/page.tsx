@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type Movie = {
   id: number;
@@ -20,12 +23,18 @@ export default function AdminPage() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [page, setPage] = useState(1);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
+  const [proposedStartDate, setProposedStartDate] = useState<string>('');
 
   // Load from localStorage on mount
   useEffect(() => {
     const savedId = localStorage.getItem('featuredMovieId');
     if (savedId) {
       setSelectedMovieId(parseInt(savedId, 10));
+    }
+    
+    const savedDate = localStorage.getItem('proposedStartDate');
+    if (savedDate) {
+      setProposedStartDate(savedDate);
     }
   }, []);
 
@@ -70,48 +79,92 @@ export default function AdminPage() {
     fetchMovies();
   }, [page]);
 
-  return (
-    <main className="max-w-5xl mx-auto py-10 space-y-6">
-      <h1 className="text-3xl font-bold">🎬 Select Featured Film</h1>
-      <p className="text-muted-foreground">
-        Releases from <strong>{minDate}</strong> to <strong>{maxDate}</strong>
-      </p>
+  const handleSaveDate = () => {
+    if (proposedStartDate) {
+      localStorage.setItem('proposedStartDate', proposedStartDate);
+    }
+  };
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {movies.map((movie) => (
-          <Card
-            key={movie.id}
-            className={`cursor-pointer border-2 ${
-              selectedMovieId === movie.id ? 'border-primary' : 'border-border'
-            }`}
-            onClick={() => setSelectedMovieId(movie.id)}
-          >
-            <CardContent className="p-4 space-y-2">
-              {movie.poster_path && (
-                <img
-                  src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-                  alt={movie.title}
-                  className="rounded"
-                />
-              )}
-              <h2 className="text-lg font-semibold">{movie.title}</h2>
-              <p className="text-sm text-muted-foreground">
-                Release: {movie.release_date}
-              </p>
-              {selectedMovieId === movie.id && (
-                <p className="text-primary font-bold">🎯 Selected</p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+  return (
+    <main className="max-w-5xl mx-auto py-10 space-y-8">
+      <div className="flex justify-between items-start mb-8">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold">🎬 Admin Dashboard</h1>
+          <p className="text-muted-foreground">
+            Configure movie selection and event planning
+          </p>
+        </div>
+        <ThemeToggle />
       </div>
 
-      <div className="flex justify-between items-center pt-6">
-        <Button variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)}>
+      <Card className="rounded-2xl shadow-lg">
+        <CardHeader>
+          <h2 className="text-2xl font-semibold">Proposed Start Date</h2>
+          <p className="text-muted-foreground">Set the proposed date for movie night planning</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="start-date">Proposed Start Date</Label>
+            <Input
+              id="start-date"
+              type="date"
+              value={proposedStartDate}
+              onChange={(e) => setProposedStartDate(e.target.value)}
+              className="w-full max-w-xs"
+            />
+          </div>
+          <Button onClick={handleSaveDate} disabled={!proposedStartDate}>
+            Save Date
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl shadow-lg">
+        <CardHeader>
+          <h2 className="text-2xl font-semibold">Select Featured Film</h2>
+          <p className="text-muted-foreground">
+            Releases from <strong>{minDate}</strong> to <strong>{maxDate}</strong>
+          </p>
+        </CardHeader>
+        <CardContent>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {movies.map((movie) => (
+              <Card
+                key={movie.id}
+                className={`cursor-pointer border-2 rounded-2xl transition-all hover:shadow-md ${
+                  selectedMovieId === movie.id ? 'border-primary shadow-lg' : 'border-border'
+                }`}
+                onClick={() => setSelectedMovieId(movie.id)}
+              >
+                <CardContent className="p-4 space-y-2">
+                  {movie.poster_path && (
+                    <img
+                      src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                      alt={movie.title}
+                      className="rounded-lg w-full"
+                    />
+                  )}
+                  <h3 className="text-lg font-semibold">{movie.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Release: {movie.release_date}
+                  </p>
+                  {selectedMovieId === movie.id && (
+                    <p className="text-primary font-bold">🎯 Selected</p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-between items-center">
+        <Button variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)} className="rounded-lg">
           ⬅ Prev
         </Button>
-        <span>Page {page}</span>
-        <Button variant="outline" onClick={() => setPage(page + 1)}>
+        <span className="text-sm text-muted-foreground">Page {page}</span>
+        <Button variant="outline" onClick={() => setPage(page + 1)} className="rounded-lg">
           Next ➡
         </Button>
       </div>
