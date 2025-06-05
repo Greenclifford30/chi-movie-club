@@ -25,29 +25,46 @@ export default function AdminPage() {
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
   const [proposedStartDate, setProposedStartDate] = useState<string>('');
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const savedId = localStorage.getItem('featuredMovieId');
-    if (savedId) {
-      setSelectedMovieId(parseInt(savedId, 10));
+  // Function to trigger admin selection API request
+  const triggerAdminSelection = async (movieId: number, movieTitle: string) => {
+    try {
+      console.log(`Submitting admin selection: ${movieTitle} (ID: ${movieId}) on date: ${proposedStartDate}`);
+      const response = await fetch('/api/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          movieId,
+          movieTitle,
+          showDate: proposedStartDate,
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        console.log('Admin selection submitted successfully:', result);
+      } else {
+        console.error('Error submitting admin selection:', result.error);
+      }
+    } catch (error) {
+      console.error('Error submitting admin selection:', error);
     }
-    
-    const savedDate = localStorage.getItem('proposedStartDate');
-    if (savedDate) {
-      setProposedStartDate(savedDate);
-    }
-  }, []);
+  };
 
-  // Save selected movie to localStorage when it changes
-  useEffect(() => {
-    if (selectedMovieId !== null) {
-      const selected = movies.find((m) => m.id === selectedMovieId);
+  // Function to handle movie selection
+  const handleMovieSelection = (movieId: number) => {
+    setSelectedMovieId(movieId);
+    
+    // Trigger API if both movie and date are selected
+    if (proposedStartDate) {
+      const selected = movies.find((m) => m.id === movieId);
       if (selected) {
-        localStorage.setItem('featuredMovieId', selected.id.toString());
-        localStorage.setItem('featuredMovieTitle', selected.title);
+        triggerAdminSelection(selected.id, selected.title);
       }
     }
-  }, [selectedMovieId, movies]);
+  };
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -81,7 +98,13 @@ export default function AdminPage() {
 
   const handleSaveDate = () => {
     if (proposedStartDate) {
-      localStorage.setItem('proposedStartDate', proposedStartDate);
+      // Trigger API request if both movie and date are selected
+      if (selectedMovieId !== null) {
+        const selected = movies.find((m) => m.id === selectedMovieId);
+        if (selected) {
+          triggerAdminSelection(selected.id, selected.title);
+        }
+      }
     }
   };
 
@@ -135,7 +158,7 @@ export default function AdminPage() {
                 className={`cursor-pointer border-2 rounded-2xl transition-all hover:shadow-md ${
                   selectedMovieId === movie.id ? 'border-primary shadow-lg' : 'border-border'
                 }`}
-                onClick={() => setSelectedMovieId(movie.id)}
+                onClick={() => handleMovieSelection(movie.id)}
               >
                 <CardContent className="p-4 space-y-2">
                   {movie.poster_path && (
