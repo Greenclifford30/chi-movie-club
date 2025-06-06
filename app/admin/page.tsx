@@ -19,11 +19,14 @@ export default function AdminPage() {
   const today = new Date();
   const minDate = format(new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
   const maxDate = format(new Date(today.getTime() + 28 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
+  const year = today.getFullYear().toString()
 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [page, setPage] = useState(1);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
   const [proposedStartDate, setProposedStartDate] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchMode, setIsSearchMode] = useState<boolean>(false);
 
   // Function to trigger admin selection API request
   const triggerAdminSelection = async (movieId: number, movieTitle: string) => {
@@ -66,35 +69,61 @@ export default function AdminPage() {
     }
   };
 
-  useEffect(() => {
-    const fetchMovies = async () => {
-      const url = new URL("https://api.themoviedb.org/3/discover/movie");
-      url.searchParams.set("include_adult", "false");
-      url.searchParams.set("include_video", "false");
-      url.searchParams.set("language", "en-US");
-      url.searchParams.set("region", "US");
+  const fetchMovies = async () => {
+    let url: URL;
+    
+    if (isSearchMode && searchQuery.trim()) {
+      // Search mode
+      url = new URL("https://api.themoviedb.org/3/search/movie");
+      url.searchParams.set("query", searchQuery.trim());
+      url.searchParams.set("primary_release_year", year);
+    } else {
+      // Discover mode
+      url = new URL("https://api.themoviedb.org/3/discover/movie");
       url.searchParams.set("sort_by", "popularity.desc");
       url.searchParams.set("with_release_type", "2|3");
       url.searchParams.set("release_date.gte", minDate);
       url.searchParams.set("release_date.lte", maxDate);
-      url.searchParams.set("page", page.toString());
+    }
+    
+    // Common parameters
+    url.searchParams.set("include_adult", "false");
+    url.searchParams.set("include_video", "false");
+    url.searchParams.set("language", "en-US");
+    url.searchParams.set("region", "US");
+    url.searchParams.set("page", page.toString());
 
-      try {
-        const res = await fetch(url.toString(), {
-          headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_API_KEY}`,
-          },
-        });
+    try {
+      const res = await fetch(url.toString(), {
+        headers: {
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_API_KEY}`,
+        },
+      });
 
-        const data = await res.json();
-        setMovies(data.results || []);
-      } catch (err) {
-        console.error("Error fetching movies:", err);
-      }
-    };
+      const data = await res.json();
+      setMovies(data.results || []);
+    } catch (err) {
+      console.error("Error fetching movies:", err);
+    }
+  };
 
+  useEffect(() => {
     fetchMovies();
-  }, [page]);
+  }, [page, isSearchMode]);
+
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      setIsSearchMode(true);
+      setPage(1);
+      fetchMovies();
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setIsSearchMode(false);
+    setPage(1);
+  };
 
   const handleSaveDate = () => {
     if (proposedStartDate) {
@@ -146,13 +175,39 @@ export default function AdminPage() {
         <CardHeader>
           <h2 className="text-2xl font-semibold">Select Featured Film</h2>
           <p className="text-muted-foreground">
-            Releases from <strong>{minDate}</strong> to <strong>{maxDate}</strong>
+            {isSearchMode ? `Search results for "${searchQuery}"` : `Releases from ${minDate} to ${maxDate}`}
           </p>
         </CardHeader>
         <CardContent>
+          <div className="mb-6 space-y-4">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  placeholder="Search for a movie title..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="w-full"
+                />
+              </div>
+              <Button onClick={handleSearch} disabled={!searchQuery.trim()}>
+                Search
+              </Button>
+              {isSearchMode && (
+                <Button variant="outline" onClick={handleClearSearch}>
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {movies.map((movie) => (
+          {movies.length === 0 && isSearchMode ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No movies found for "{searchQuery}". Try a different search term.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {movies.map((movie) => (
               <Card
                 key={movie.id}
                 className={`cursor-pointer border-2 rounded-2xl transition-all hover:shadow-md ${
@@ -170,15 +225,19 @@ export default function AdminPage() {
                   )}
                   <h3 className="text-lg font-semibold">{movie.title}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Release: {movie.release_date}
+                    Release: {movie.release_date || 'TBA'}
                   </p>
+                  {isSearchMode && (
+                    <p className="text-xs text-blue-600 font-medium">🔍 Search Result</p>
+                  )}
                   {selectedMovieId === movie.id && (
                     <p className="text-primary font-bold">🎯 Selected</p>
                   )}
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
