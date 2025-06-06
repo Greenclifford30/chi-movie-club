@@ -38,12 +38,12 @@ export default function AdminPage() {
     }
   }, []);
 
-  // Save selected movie to localStorage when it changes
+  // Save to localStorage when movie selection changes
   useEffect(() => {
     if (selectedMovieId !== null) {
+      localStorage.setItem('featuredMovieId', selectedMovieId.toString());
       const selected = movies.find((m) => m.id === selectedMovieId);
       if (selected) {
-        localStorage.setItem('featuredMovieId', selected.id.toString());
         localStorage.setItem('featuredMovieTitle', selected.title);
       }
     }
@@ -79,9 +79,39 @@ export default function AdminPage() {
     fetchMovies();
   }, [page]);
 
-  const handleSaveDate = () => {
+
+  const handleSaveDate = async () => {
     if (proposedStartDate) {
       localStorage.setItem('proposedStartDate', proposedStartDate);
+    }
+  };
+
+  const handleSaveSelection = async () => {
+    if (!selectedMovieId || !proposedStartDate) return;
+    
+    const selected = movies.find((m) => m.id === selectedMovieId);
+    if (!selected) return;
+
+    try {
+      const response = await fetch('/api/admin/selection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          movieId: selected.id,
+          movieTitle: selected.title,
+          proposedStartDate: proposedStartDate,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('Selection saved successfully');
+      } else {
+        console.error('Failed to save selection to API');
+      }
+    } catch (error) {
+      console.error('Error saving selection:', error);
     }
   };
 
@@ -158,6 +188,26 @@ export default function AdminPage() {
           </div>
         </CardContent>
       </Card>
+
+      {selectedMovieId && proposedStartDate && (
+        <Card className="rounded-2xl shadow-lg border-primary">
+          <CardHeader>
+            <h2 className="text-2xl font-semibold">Save Selection</h2>
+            <p className="text-muted-foreground">
+              Save your movie and date selection to complete the setup
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <p className="font-medium">Selected Movie: {movies.find(m => m.id === selectedMovieId)?.title}</p>
+              <p className="text-muted-foreground">Proposed Date: {proposedStartDate}</p>
+            </div>
+            <Button onClick={handleSaveSelection} className="w-full">
+              Save Movie Selection
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex justify-between items-center">
         <Button variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)} className="rounded-lg">
