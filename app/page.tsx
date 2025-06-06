@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 interface MovieOption {
@@ -34,9 +34,9 @@ export default function HomePage() {
   const [movieOptions, setMovieOptions] = useState<MovieOption[]>([]);
   const [posterPath, setPosterPath] = useState<string | null>(null);
   const [showtimes, setShowtimes] = useState<ShowtimeSlot[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedShowtimes, setSelectedShowtimes] = useState<string[]>([]);
-  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [availableDates, setAvailableDates] = useState<Date[]>([]);
 
   useEffect(() => {
     const TMDB_ACCESS_TOKEN = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -48,9 +48,10 @@ export default function HomePage() {
         setMovieOptions(data);
         
         // Extract all unique dates and sort them
-        const dates = [...new Set(data.map(option => option.showDate))].sort();
+        const dateStrings = [...new Set(data.map(option => option.showDate))].sort();
+        const dates = dateStrings.map(dateStr => parseISO(dateStr));
         setAvailableDates(dates);
-        setSelectedDate(dates[0] || "");
+        setSelectedDate(dates[0] || undefined);
         
         // Parse all showtimes from the new API structure
         const parsed: ShowtimeSlot[] = [];
@@ -96,7 +97,10 @@ export default function HomePage() {
   }, []);
 
   // Filter showtimes by selected date
-  const filteredShowtimes = showtimes.filter(showtime => showtime.date === selectedDate);
+  const filteredShowtimes = showtimes.filter(showtime => {
+    if (!selectedDate) return false;
+    return showtime.date === format(selectedDate, 'yyyy-MM-dd');
+  });
   
   // Group showtimes by theater
   const showtimesByTheater = filteredShowtimes.reduce((acc, showtime) => {
@@ -151,7 +155,7 @@ export default function HomePage() {
             )}
             {availableDates.length > 0 && (
               <p className="text-muted-foreground">
-                Available: {format(parseISO(availableDates[0]), 'EEEE, MMMM do')} - {format(parseISO(availableDates[availableDates.length - 1]), 'EEEE, MMMM do, yyyy')}
+                Available: {format(availableDates[0], 'EEEE, MMMM do')} - {format(availableDates[availableDates.length - 1], 'EEEE, MMMM do, yyyy')}
               </p>
             )}
           </CardContent>
@@ -163,19 +167,39 @@ export default function HomePage() {
               <h2 className="text-2xl font-semibold">Select Date</h2>
               <p className="text-muted-foreground">Choose which date you&apos;d like to see the movie.</p>
             </CardHeader>
-            <CardContent>
-              <Select value={selectedDate} onValueChange={setSelectedDate}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a date" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableDates.map((date) => (
-                    <SelectItem key={date} value={date}>
-                      {format(parseISO(date), 'EEEE, MMMM do, yyyy')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <CardContent className="space-y-4">
+              <div className="flex justify-center">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  disabled={(date) => {
+                    // Only enable dates that are available
+                    return !availableDates.some(availableDate => 
+                      format(availableDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                    );
+                  }}
+                  modifiers={{
+                    available: availableDates,
+                  }}
+                  modifiersClassNames={{
+                    available: "available-date",
+                  }}
+                  className="rounded-md border"
+                />
+              </div>
+              <div className="flex justify-center gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-100 dark:bg-green-900/30 border-2 border-green-400 dark:border-green-500 rounded flex items-center justify-center">
+                    <span className="text-green-600 dark:text-green-400 text-xs">●</span>
+                  </div>
+                  <span className="text-muted-foreground">Available</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-muted/30 rounded opacity-25"></div>
+                  <span className="text-muted-foreground">Unavailable</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -185,7 +209,7 @@ export default function HomePage() {
             <CardHeader>
               <h2 className="text-2xl font-semibold">Select Showtimes</h2>
               <p className="text-muted-foreground">
-                Choose up to 3 preferred showtimes for {format(parseISO(selectedDate), 'EEEE, MMMM do')}. 
+                Choose up to 3 preferred showtimes for {selectedDate ? format(selectedDate, 'EEEE, MMMM do') : ''}. 
                 Selected: {selectedShowtimes.length}/3
               </p>
             </CardHeader>

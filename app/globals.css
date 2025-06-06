@@ -120,3 +120,51 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Calendar component styling */
+.rdp {
+  --rdp-cell-size: 40px;
+  --rdp-accent-color: theme(colors.primary.DEFAULT);
+  --rdp-background-color: theme(colors.background);
+  --rdp-accent-color-dark: theme(colors.primary.DEFAULT);
+  --rdp-background-color-dark: theme(colors.background);
+  --rdp-outline: 2px solid var(--rdp-accent-color);
+  --rdp-outline-selected: 2px solid rgba(0, 0, 0, 0.75);
+}
+
+/* Available dates styling */
+.available-date {
+  @apply bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold;
+  @apply border-2 border-green-400 dark:border-green-500;
+  @apply hover:bg-green-200 dark:hover:bg-green-800/50;
+  @apply relative;
+}
+
+.available-date::after {
+  content: "●";
+  @apply absolute bottom-1 left-1/2 transform -translate-x-1/2;
+  @apply text-green-600 dark:text-green-400 text-xs leading-none;
+}
+
+/* Enhanced disabled styling */
+.rdp .rdp-day_disabled {
+  @apply opacity-25 cursor-not-allowed;
+  @apply text-muted-foreground/50;
+  @apply bg-muted/30;
+}
+
+.rdp .rdp-day_disabled:hover {
+  @apply bg-muted/30;
+}
+
+/* Today styling when available */
+.available-date.rdp-day_today {
+  @apply bg-green-200 dark:bg-green-800/60;
+  @apply border-green-500 dark:border-green-400;
+}
+
+/* Selected available date */
+.available-date.rdp-day_selected {
+  @apply bg-primary text-primary-foreground;
+  @apply border-primary;
+}
