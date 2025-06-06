@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,53 +70,52 @@ export default function AdminPage() {
     }
   };
 
-  const fetchMovies = async () => {
-    let url: URL;
-    
-    if (isSearchMode && searchQuery.trim()) {
-      // Search mode
-      url = new URL("https://api.themoviedb.org/3/search/movie");
-      url.searchParams.set("query", searchQuery.trim());
-      url.searchParams.set("primary_release_year", year);
-    } else {
-      // Discover mode
-      url = new URL("https://api.themoviedb.org/3/discover/movie");
-      url.searchParams.set("sort_by", "popularity.desc");
-      url.searchParams.set("with_release_type", "2|3");
-      url.searchParams.set("release_date.gte", minDate);
-      url.searchParams.set("release_date.lte", maxDate);
-    }
-    
-    // Common parameters
-    url.searchParams.set("include_adult", "false");
-    url.searchParams.set("include_video", "false");
-    url.searchParams.set("language", "en-US");
-    url.searchParams.set("region", "US");
-    url.searchParams.set("page", page.toString());
-
-    try {
-      const res = await fetch(url.toString(), {
-        headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_API_KEY}`,
-        },
-      });
-
-      const data = await res.json();
-      setMovies(data.results || []);
-    } catch (err) {
-      console.error("Error fetching movies:", err);
-    }
-  };
-
   useEffect(() => {
+    const fetchMovies = async () => {
+      let url: URL;
+      
+      if (isSearchMode && searchQuery.trim()) {
+        // Search mode
+        url = new URL("https://api.themoviedb.org/3/search/movie");
+        url.searchParams.set("query", searchQuery.trim());
+        url.searchParams.set("primary_release_year", year);
+      } else {
+        // Discover mode
+        url = new URL("https://api.themoviedb.org/3/discover/movie");
+        url.searchParams.set("sort_by", "popularity.desc");
+        url.searchParams.set("with_release_type", "2|3");
+        url.searchParams.set("release_date.gte", minDate);
+        url.searchParams.set("release_date.lte", maxDate);
+      }
+      
+      // Common parameters
+      url.searchParams.set("include_adult", "false");
+      url.searchParams.set("include_video", "false");
+      url.searchParams.set("language", "en-US");
+      url.searchParams.set("region", "US");
+      url.searchParams.set("page", page.toString());
+
+      try {
+        const res = await fetch(url.toString(), {
+          headers: {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_API_KEY}`,
+          },
+        });
+
+        const data = await res.json();
+        setMovies(data.results || []);
+      } catch (err) {
+        console.error("Error fetching movies:", err);
+      }
+    };
+
     fetchMovies();
-  }, [page, isSearchMode]);
+  }, [page, isSearchMode, searchQuery, year, minDate, maxDate]);
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
       setIsSearchMode(true);
       setPage(1);
-      fetchMovies();
     }
   };
 
@@ -175,7 +175,7 @@ export default function AdminPage() {
         <CardHeader>
           <h2 className="text-2xl font-semibold">Select Featured Film</h2>
           <p className="text-muted-foreground">
-            {isSearchMode ? `Search results for "${searchQuery}"` : `Releases from ${minDate} to ${maxDate}`}
+            {isSearchMode ? `Search results for &ldquo;${searchQuery}&rdquo;` : `Releases from ${minDate} to ${maxDate}`}
           </p>
         </CardHeader>
         <CardContent>
@@ -203,7 +203,7 @@ export default function AdminPage() {
 
           {movies.length === 0 && isSearchMode ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">No movies found for "{searchQuery}". Try a different search term.</p>
+              <p className="text-muted-foreground">No movies found for &ldquo;{searchQuery}&rdquo;. Try a different search term.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -217,11 +217,15 @@ export default function AdminPage() {
               >
                 <CardContent className="p-4 space-y-2">
                   {movie.poster_path && (
-                    <img
-                      src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-                      alt={movie.title}
-                      className="rounded-lg w-full"
-                    />
+                    <div className="relative w-full aspect-[2/3]">
+                      <Image
+                        src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                        alt={movie.title}
+                        fill
+                        className="rounded-lg object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 25vw"
+                      />
+                    </div>
                   )}
                   <h3 className="text-lg font-semibold">{movie.title}</h3>
                   <p className="text-sm text-muted-foreground">

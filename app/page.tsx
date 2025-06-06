@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useState } from "react";
-import { format, addDays, parseISO, isAfter } from "date-fns";
+import { format, parseISO } from "date-fns";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 interface MovieOption {
@@ -38,9 +38,9 @@ export default function HomePage() {
   const [selectedShowtimes, setSelectedShowtimes] = useState<string[]>([]);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
 
-const TMDB_ACCESS_TOKEN = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-
   useEffect(() => {
+    const TMDB_ACCESS_TOKEN = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+    
     // Fetch movie options from API gateway
     fetch('/api/showtimes')
       .then((res) => res.json())
@@ -139,11 +139,15 @@ const TMDB_ACCESS_TOKEN = process.env.NEXT_PUBLIC_TMDB_API_KEY;
           </CardHeader>
           <CardContent className="text-center">
             {posterPath && (
-              <img
-                src={`https://image.tmdb.org/t/p/w300${posterPath}`}
-                alt={movieOptions[0]?.movieTitle ?? "Movie Poster"}
-                className="mx-auto rounded-lg shadow-md mb-4"
-              />
+              <div className="relative w-[300px] h-[450px] mx-auto mb-4">
+                <Image
+                  src={`https://image.tmdb.org/t/p/w300${posterPath}`}
+                  alt={movieOptions[0]?.movieTitle ?? "Movie Poster"}
+                  fill
+                  className="rounded-lg shadow-md object-cover"
+                  sizes="300px"
+                />
+              </div>
             )}
             {availableDates.length > 0 && (
               <p className="text-muted-foreground">
