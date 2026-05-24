@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,47 +20,84 @@ export default function AdminPage() {
   const today = new Date();
   const minDate = format(new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
   const maxDate = format(new Date(today.getTime() + 28 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
+  const year = today.getFullYear().toString()
 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [page, setPage] = useState(1);
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
   const [proposedStartDate, setProposedStartDate] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchMode, setIsSearchMode] = useState<boolean>(false);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const savedId = localStorage.getItem('featuredMovieId');
-    if (savedId) {
-      setSelectedMovieId(parseInt(savedId, 10));
+  // Function to trigger admin selection API request
+  const triggerAdminSelection = async (movieId: number, movieTitle: string) => {
+    try {
+      console.log(`Submitting admin selection: ${movieTitle} (ID: ${movieId}) on date: ${proposedStartDate}`);
+      const response = await fetch('/api/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          movieId,
+          movieTitle,
+          showDate: proposedStartDate,
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        console.log('Admin selection submitted successfully:', result);
+      } else {
+        console.error('Error submitting admin selection:', result.error);
+      }
+    } catch (error) {
+      console.error('Error submitting admin selection:', error);
     }
+  };
+
+  // Function to handle movie selection
+  const handleMovieSelection = (movieId: number) => {
+    setSelectedMovieId(movieId);
     
-    const savedDate = localStorage.getItem('proposedStartDate');
-    if (savedDate) {
-      setProposedStartDate(savedDate);
-    }
-  }, []);
-
+    // Trigger API if both movie and date are selected
+    if (proposedStartDate) {
+      const selected = movies.find((m) => m.id === movieId);
   // Save to localStorage when movie selection changes
   useEffect(() => {
     if (selectedMovieId !== null) {
       localStorage.setItem('featuredMovieId', selectedMovieId.toString());
       const selected = movies.find((m) => m.id === selectedMovieId);
       if (selected) {
-        localStorage.setItem('featuredMovieTitle', selected.title);
+        triggerAdminSelection(selected.id, selected.title);
       }
     }
-  }, [selectedMovieId, movies]);
+  };
 
   useEffect(() => {
     const fetchMovies = async () => {
-      const url = new URL("https://api.themoviedb.org/3/discover/movie");
+      let url: URL;
+      
+      if (isSearchMode && searchQuery.trim()) {
+        // Search mode
+        url = new URL("https://api.themoviedb.org/3/search/movie");
+        url.searchParams.set("query", searchQuery.trim());
+        url.searchParams.set("primary_release_year", year);
+      } else {
+        // Discover mode
+        url = new URL("https://api.themoviedb.org/3/discover/movie");
+        url.searchParams.set("sort_by", "popularity.desc");
+        url.searchParams.set("with_release_type", "2|3");
+        url.searchParams.set("release_date.gte", minDate);
+        url.searchParams.set("release_date.lte", maxDate);
+      }
+      
+      // Common parameters
       url.searchParams.set("include_adult", "false");
       url.searchParams.set("include_video", "false");
       url.searchParams.set("language", "en-US");
       url.searchParams.set("region", "US");
-      url.searchParams.set("sort_by", "popularity.desc");
-      url.searchParams.set("with_release_type", "2|3");
-      url.searchParams.set("release_date.gte", minDate);
-      url.searchParams.set("release_date.lte", maxDate);
       url.searchParams.set("page", page.toString());
 
       try {
@@ -77,41 +115,30 @@ export default function AdminPage() {
     };
 
     fetchMovies();
-  }, [page]);
+  }, [page, isSearchMode, searchQuery, year, minDate, maxDate]);
 
-
-  const handleSaveDate = async () => {
-    if (proposedStartDate) {
-      localStorage.setItem('proposedStartDate', proposedStartDate);
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      setIsSearchMode(true);
+      setPage(1);
     }
   };
 
-  const handleSaveSelection = async () => {
-    if (!selectedMovieId || !proposedStartDate) return;
-    
-    const selected = movies.find((m) => m.id === selectedMovieId);
-    if (!selected) return;
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setIsSearchMode(false);
+    setPage(1);
+  };
 
-    try {
-      const response = await fetch('/api/admin/selection', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          movieId: selected.id,
-          movieTitle: selected.title,
-          proposedStartDate: proposedStartDate,
-        }),
-      });
-
-      if (response.ok) {
-        console.log('Selection saved successfully');
-      } else {
-        console.error('Failed to save selection to API');
+  const handleSaveDate = () => {
+    if (proposedStartDate) {
+      // Trigger API request if both movie and date are selected
+      if (selectedMovieId !== null) {
+        const selected = movies.find((m) => m.id === selectedMovieId);
+        if (selected) {
+          triggerAdminSelection(selected.id, selected.title);
+        }
       }
-    } catch (error) {
-      console.error('Error saving selection:', error);
     }
   };
 
@@ -153,39 +180,73 @@ export default function AdminPage() {
         <CardHeader>
           <h2 className="text-2xl font-semibold">Select Featured Film</h2>
           <p className="text-muted-foreground">
-            Releases from <strong>{minDate}</strong> to <strong>{maxDate}</strong>
+            {isSearchMode ? `Search results for &ldquo;${searchQuery}&rdquo;` : `Releases from ${minDate} to ${maxDate}`}
           </p>
         </CardHeader>
         <CardContent>
+          <div className="mb-6 space-y-4">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  placeholder="Search for a movie title..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="w-full"
+                />
+              </div>
+              <Button onClick={handleSearch} disabled={!searchQuery.trim()}>
+                Search
+              </Button>
+              {isSearchMode && (
+                <Button variant="outline" onClick={handleClearSearch}>
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {movies.map((movie) => (
+          {movies.length === 0 && isSearchMode ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No movies found for &ldquo;{searchQuery}&rdquo;. Try a different search term.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {movies.map((movie) => (
               <Card
                 key={movie.id}
                 className={`cursor-pointer border-2 rounded-2xl transition-all hover:shadow-md ${
                   selectedMovieId === movie.id ? 'border-primary shadow-lg' : 'border-border'
                 }`}
-                onClick={() => setSelectedMovieId(movie.id)}
+                onClick={() => handleMovieSelection(movie.id)}
               >
                 <CardContent className="p-4 space-y-2">
                   {movie.poster_path && (
-                    <img
-                      src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-                      alt={movie.title}
-                      className="rounded-lg w-full"
-                    />
+                    <div className="relative w-full aspect-[2/3]">
+                      <Image
+                        src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                        alt={movie.title}
+                        fill
+                        className="rounded-lg object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 25vw"
+                      />
+                    </div>
                   )}
                   <h3 className="text-lg font-semibold">{movie.title}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Release: {movie.release_date}
+                    Release: {movie.release_date || 'TBA'}
                   </p>
+                  {isSearchMode && (
+                    <p className="text-xs text-blue-600 font-medium">🔍 Search Result</p>
+                  )}
                   {selectedMovieId === movie.id && (
                     <p className="text-primary font-bold">🎯 Selected</p>
                   )}
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
