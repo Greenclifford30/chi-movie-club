@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&amp;family=Geist:wght@400;600;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glow-violet {
+            box-shadow: 0 0 20px -5px rgba(139, 92, 246, 0.3);
+        }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#353434",
+                        "error-red": "#EF4444",
+                        "primary-fixed-dim": "#c6c6c7",
+                        "inverse-on-surface": "#313030",
+                        "primary": "#ffffff",
+                        "warning-amber": "#F59E0B",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "outline": "#8e9192",
+                        "tertiary-container": "#e2e2e2",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e5e2e1",
+                        "outline-variant": "#444748",
+                        "on-tertiary-container": "#636565",
+                        "border-strong": "#404040",
+                        "on-primary-fixed-variant": "#454747",
+                        "surface-bright": "#3a3939",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "tertiary-fixed": "#e2e2e2",
+                        "primary-container": "#e2e2e2",
+                        "tertiary": "#ffffff",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "secondary-container": "#474746",
+                        "on-primary-container": "#636565",
+                        "surface-container-low": "#1c1b1b",
+                        "primary-fixed": "#e2e2e2",
+                        "on-secondary-container": "#b7b4b4",
+                        "surface-container": "#201f1f",
+                        "secondary": "#c8c6c5",
+                        "surface-container-high": "#2a2a2a",
+                        "on-surface-variant": "#c4c7c8",
+                        "error-container": "#93000a",
+                        "success-green": "#22C55E",
+                        "on-secondary-fixed-variant": "#474746",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-primary-fixed": "#1a1c1c",
+                        "inverse-surface": "#e5e2e1",
+                        "surface": "#141313",
+                        "background": "#141313",
+                        "surface-container-lowest": "#0e0e0e",
+                        "inverse-primary": "#5d5f5f",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "on-primary": "#2f3131",
+                        "info-blue": "#3B82F6",
+                        "surface-dim": "#141313",
+                        "border-subtle": "#262626",
+                        "on-tertiary": "#2f3131",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#353434",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-error": "#690005",
+                        "surface-tint": "#c6c6c7",
+                        "on-secondary": "#313030"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gap-md": "16px",
+                        "margin-desktop": "32px",
+                        "gap-sm": "8px",
+                        "gap-lg": "24px",
+                        "unit": "4px",
+                        "margin-mobile": "16px",
+                        "gap-xs": "4px"
+                    },
+                    "fontFamily": {
+                        "code-md": ["JetBrains Mono"],
+                        "headline-md": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "label-sm": ["JetBrains Mono"],
+                        "body-md": ["Geist"],
+                        "headline-lg": ["Geist"]
+                    },
+                    "fontSize": {
+                        "code-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body-md text-body-md overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- Top AppBar - Following JSON Structure -->
+<header class="fixed top-0 z-50 w-full bg-surface dark:bg-surface border-b border-border-strong flex justify-between items-center px-margin-mobile h-16 max-w-full">
+<div class="flex items-center gap-gap-sm">
+<span class="font-headline-md text-headline-md font-extrabold tracking-tighter text-primary">Movie Club</span>
+</div>
+<div class="flex items-center gap-gap-md">
+<button class="material-symbols-outlined text-on-surface-variant p-2 hover:bg-surface-container-highest transition-all duration-200">notifications</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-border-strong">
+<img alt="Profile" class="w-full h-full object-cover" data-alt="A clean, minimalist 2D avatar of a professional developer in a dark environment. The illustration uses a grayscale palette with sharp, clean lines and a modern tech aesthetic, fitting a high-density, technical user interface. The background is a dark charcoal grey." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZ1Fk5J5w5YwxsNyhT7P2-q786cFAOkJyJZnisEOfoqkVFMarZTdseUijPyYvgUBGROMFf7dxyblmLpF4i0u6fgUcUkGL0LRGzG7Rg1G126bxxRwBfA02j2d99_y_DntNGJvI4ztPjta-MEK1ricz9QYm1-OR_AXokZnmerTIKqger0sBYF50aOXCHQKUqJQ5kanTGOMap0X5tYq7j0Vq1oPpnu7BlhdGmeXBQtIG-gsG8G7BDWjUWD-snL82EAXyDW-7rfA9CF4m0"/>
+</div>
+</div>
+</header>
+<main class="pt-16 pb-24 px-margin-mobile space-y-gap-lg">
+<!-- 1. Status Banner -->
+<section class="mt-4 animate-pulse">
+<div class="bg-surface-container-high border border-border-strong px-4 py-3 flex items-center justify-between rounded-lg glow-violet">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-success-green"></span>
+<span class="font-label-sm text-label-sm text-success-green uppercase">Voting is open</span>
+</div>
+<span class="font-code-md text-code-md text-on-surface-variant">04h 22m left</span>
+</div>
+</section>
+<!-- 2. Featured Movie Section -->
+<section class="relative group">
+<div class="relative w-full aspect-[2/3] overflow-hidden rounded-xl border border-border-strong">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="A cinematic, high-contrast poster-style image depicting a vast, mysterious desert landscape at twilight with two moons in the sky. The lighting is dramatic, casting deep violet and indigo shadows across sharp sand dunes. The overall aesthetic is sci-fi, epic, and minimalist, using a dark monochromatic palette with subtle orange highlights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCz-hlaJpcZ1IsBvpP8-8MUsiJU61J1Rv59LtboaWlXsd9DgXMheAgkfwg-2F0fZ76Oni0rpYZfH1sbatvs7KFX5sXi6cIIVqDgD-rkzBD3cERjanIeUEXf2ID61gCAfaBbkWyhNaVSruksX2AZsPX09r4xGT1jDKPSz_PXIahL_a_-bc-1DAQsz5dbuT7SHsj_00d0bSQaXtCr0YlETxhgYgh2vHHtBVDLZnDmGc-FvpCwX4ZXIwrva8iXvCk3gu3e2XsZcYwB7xKn"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>
+<div class="absolute bottom-4 left-4 right-4">
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tighter">Dune: Part Two</h1>
+<div class="flex gap-2 mt-2">
+<span class="bg-surface-container-lowest px-2 py-1 rounded border border-border-subtle font-code-md text-code-md text-on-surface-variant">2h 46m</span>
+<span class="bg-surface-container-lowest px-2 py-1 rounded border border-border-subtle font-code-md text-code-md text-on-surface-variant">Sci-Fi / Epic</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. Action Panel: Ranked-Choice Slots -->
+<section class="space-y-gap-md">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-md text-headline-md text-primary">Your Choices</h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Ranked Choice</span>
+</div>
+<div class="space-y-gap-sm">
+<!-- Slot 1 -->
+<div class="choice-slot border border-border-strong bg-surface-container-lowest p-4 rounded-lg flex items-center gap-4 transition-all duration-300" id="slot-1">
+<div class="w-8 h-8 rounded-full border border-primary flex items-center justify-center font-code-md text-code-md bg-primary text-on-primary">1</div>
+<div class="flex-grow">
+<div class="text-on-surface font-semibold">Dune: Part Two</div>
+</div>
+<button class="material-symbols-outlined text-on-surface-variant">swap_vert</button>
+</div>
+<!-- Slot 2 -->
+<div class="choice-slot border border-dashed border-border-strong bg-surface p-4 rounded-lg flex items-center gap-4 group hover:bg-surface-container-high transition-colors" id="slot-2">
+<div class="w-8 h-8 rounded-full border border-border-strong flex items-center justify-center font-code-md text-code-md text-on-surface-variant">2</div>
+<div class="flex-grow">
+<div class="text-on-surface-variant font-medium">Select 2nd preference...</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">add</span>
+</div>
+<!-- Slot 3 -->
+<div class="choice-slot border border-dashed border-border-strong bg-surface p-4 rounded-lg flex items-center gap-4" id="slot-3">
+<div class="w-8 h-8 rounded-full border border-border-strong flex items-center justify-center font-code-md text-code-md text-on-surface-variant">3</div>
+<div class="flex-grow text-on-surface-variant">Select 3rd preference...</div>
+<span class="material-symbols-outlined text-on-surface-variant">add</span>
+</div>
+</div>
+</section>
+<!-- 4. Showtime List -->
+<section class="space-y-gap-md">
+<h2 class="font-headline-md text-headline-md text-primary">Available Times</h2>
+<div class="flex overflow-x-auto no-scrollbar gap-gap-sm pb-2">
+<button class="flex-shrink-0 px-4 py-2 border border-primary bg-primary text-on-primary rounded-lg font-code-md text-code-md">FRI, JUN 21</button>
+<button class="flex-shrink-0 px-4 py-2 border border-border-strong bg-surface text-on-surface-variant rounded-lg font-code-md text-code-md">SAT, JUN 22</button>
+<button class="flex-shrink-0 px-4 py-2 border border-border-strong bg-surface text-on-surface-variant rounded-lg font-code-md text-code-md">SUN, JUN 23</button>
+</div>
+<div class="space-y-2">
+<!-- Showtime Card -->
+<div class="bg-surface-container border border-border-subtle p-4 rounded-lg flex justify-between items-center group active:scale-[0.98] transition-transform">
+<div class="space-y-1">
+<div class="font-headline-md text-headline-md text-primary">19:30</div>
+<div class="font-code-md text-code-md text-on-surface-variant">IMAX Experience</div>
+</div>
+<div class="text-right">
+<div class="text-on-surface-variant font-label-sm text-label-sm">82% CAPACITY</div>
+<div class="text-success-green font-code-md text-code-md">Trending</div>
+</div>
+</div>
+<!-- Showtime Card -->
+<div class="bg-surface-container border border-border-subtle p-4 rounded-lg flex justify-between items-center group active:scale-[0.98] transition-transform">
+<div class="space-y-1">
+<div class="font-headline-md text-headline-md text-primary">21:15</div>
+<div class="font-code-md text-code-md text-on-surface-variant">Standard Screening</div>
+</div>
+<div class="text-right">
+<div class="text-on-surface-variant font-label-sm text-label-sm">45% CAPACITY</div>
+</div>
+</div>
+<!-- Showtime Card -->
+<div class="bg-surface-container border border-border-subtle p-4 rounded-lg flex justify-between items-center group active:scale-[0.98] transition-transform">
+<div class="space-y-1">
+<div class="font-headline-md text-headline-md text-primary">23:00</div>
+<div class="font-code-md text-code-md text-on-surface-variant">Late Night Cult</div>
+</div>
+<div class="text-right">
+<div class="text-on-surface-variant font-label-sm text-label-sm">12% CAPACITY</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Sticky Bottom Bar -->
+<div class="fixed bottom-0 left-0 right-0 p-margin-mobile bg-background/80 backdrop-blur-xl border-t border-border-strong z-50">
+<button class="w-full bg-primary text-on-primary py-4 rounded-lg font-headline-md text-headline-md flex items-center justify-center gap-gap-sm hover:opacity-90 active:scale-95 transition-all" onclick="handleSubmit()">
+            Submit Vote
+            <span class="material-symbols-outlined">send</span>
+</button>
+</div>
+<!-- Simple Footer - Following JSON -->
+<footer class="bg-surface-container-lowest dark:bg-surface-container-lowest border-t border-border-strong px-margin-mobile py-gap-lg flex flex-col items-center gap-gap-md mb-24">
+<div class="font-code-md text-code-md uppercase tracking-widest text-on-surface-variant">Movie Club</div>
+<div class="flex gap-4">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary" href="#">Terms</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary" href="#">Privacy</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary" href="#">Discord</a>
+</div>
+<p class="font-body-md text-body-md text-secondary text-center">© 2024 Movie Club. Engineered for cinephiles.</p>
+</footer>
+<script>
+        function handleSubmit() {
+            const btn = event.currentTarget;
+            const originalHtml = btn.innerHTML;
+            
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin">refresh</span> Processing...';
+            btn.disabled = true;
+            
+            setTimeout(() => {
+                btn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Vote Cast!';
+                btn.classList.remove('bg-primary');
+                btn.classList.add('bg-success-green');
+                
+                // Visual feedback on slots
+                document.querySelectorAll('.choice-slot').forEach(slot => {
+                    slot.style.opacity = '0.5';
+                    slot.style.pointerEvents = 'none';
+                });
+            }, 1500);
+        }
+
+        // Parallax effect on scroll for movie poster
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const hero = document.querySelector('img[data-alt*="poster-style"]');
+            if (hero) {
+                hero.style.transform = `scale(${1 + scrolled * 0.0005}) translateY(${scrolled * 0.1}px)`;
+            }
+        });
+    </script>
+</body></html>

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Admin Movie Night Setup | Movie Club</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&amp;family=Geist:wght@400;600;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#353434",
+                        "error-red": "#EF4444",
+                        "primary-fixed-dim": "#c6c6c7",
+                        "inverse-on-surface": "#313030",
+                        "primary": "#ffffff",
+                        "warning-amber": "#F59E0B",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "outline": "#8e9192",
+                        "tertiary-container": "#e2e2e2",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e5e2e1",
+                        "outline-variant": "#444748",
+                        "on-tertiary-container": "#636565",
+                        "border-strong": "#404040",
+                        "on-primary-fixed-variant": "#454747",
+                        "surface-bright": "#3a3939",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "tertiary-fixed": "#e2e2e2",
+                        "primary-container": "#e2e2e2",
+                        "tertiary": "#ffffff",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "secondary-container": "#474746",
+                        "on-primary-container": "#636565",
+                        "surface-container-low": "#1c1b1b",
+                        "primary-fixed": "#e2e2e2",
+                        "on-secondary-container": "#b7b4b4",
+                        "surface-container": "#201f1f",
+                        "secondary": "#c8c6c5",
+                        "surface-container-high": "#2a2a2a",
+                        "on-surface-variant": "#c4c7c8",
+                        "error-container": "#93000a",
+                        "success-green": "#22C55E",
+                        "on-secondary-fixed-variant": "#474746",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-primary-fixed": "#1a1c1c",
+                        "inverse-surface": "#e5e2e1",
+                        "surface": "#141313",
+                        "background": "#070A12", /* Overridden per user request for Deep Navy */
+                        "surface-container-lowest": "#0e0e0e",
+                        "inverse-primary": "#5d5f5f",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "on-primary": "#2f3131",
+                        "info-blue": "#3B82F6",
+                        "surface-dim": "#141313",
+                        "border-subtle": "#262626",
+                        "on-tertiary": "#2f3131",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#353434",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-error": "#690005",
+                        "surface-tint": "#c6c6c7",
+                        "on-secondary": "#313030"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gap-md": "16px",
+                        "margin-desktop": "32px",
+                        "gap-sm": "8px",
+                        "gap-lg": "24px",
+                        "unit": "4px",
+                        "margin-mobile": "16px",
+                        "gap-xs": "4px"
+                    },
+                    "fontFamily": {
+                        "code-md": ["JetBrains Mono"],
+                        "headline-md": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "label-sm": ["JetBrains Mono"],
+                        "body-md": ["Geist"],
+                        "headline-lg": ["Geist"]
+                    },
+                    "fontSize": {
+                        "code-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #070A12;
+            color: #e5e2e1;
+            font-family: 'Geist', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #070A12;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 2px;
+        }
+        .step-active {
+            border-left: 2px solid white;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .glass-panel {
+            background: rgba(20, 19, 19, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid #262626;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+<!-- Top Navigation Anchor -->
+<header class="docked full-width top-0 border-b border-border-strong bg-surface flex justify-between items-center w-full px-margin-desktop h-16 max-w-full z-50">
+<div class="flex items-center gap-gap-md">
+<span class="font-headline-md text-headline-md font-bold tracking-tighter text-primary">Movie Club</span>
+<div class="hidden md:flex gap-gap-md ml-margin-desktop">
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors font-body-md text-body-md" href="#">Active Night</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors font-body-md text-body-md" href="#">History</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md" href="#">Admin</a>
+</div>
+</div>
+<div class="flex items-center gap-gap-md">
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-highest p-2 rounded transition-all">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-highest p-2 rounded transition-all">group_add</button>
+<div class="h-6 w-px bg-border-strong mx-2"></div>
+<button class="text-on-surface-variant hover:text-primary font-label-sm text-label-sm transition-colors px-2 py-1">Club Switcher</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-border-strong overflow-hidden">
+<img alt="User profile avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqQG653t0pLSzoE3IfT8SvPA2mCJ7XdOs824I7neRAQX0YoJHh_ybEpYcjUXG4m_38bgsTZyk7M5fKRA0O_a2coYk011XpCjas061cg-m9k-dKGLRaUeLA9EKJ_EsNrL87lULM9e8Bb8o1WuhgdqM-oeRT9PCAkDF2oTsvF6GTrLzhKUWyQCKDkHbUV2l_Cu9r9vvOs_Zg7eE78e9kyLinlRgJlFxDvYOBLpWJYiku7XKl_zfdLQCIAtQtjoCe1RZyj7Gf3hmWaBLI"/>
+</div>
+</div>
+</header>
+<main class="flex-1 flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-hidden">
+<!-- Sidebar Navigation (Steps) -->
+<aside class="w-full md:w-64 glass-panel border-r border-border-strong flex flex-col">
+<div class="p-gap-lg border-b border-border-strong">
+<h2 class="font-code-md text-code-md uppercase tracking-widest text-on-surface-variant">Setup Wizard</h2>
+</div>
+<nav class="flex-1 py-gap-md overflow-y-auto custom-scrollbar">
+<div class="px-gap-md space-y-1">
+<!-- Step 1: Movie (Active) -->
+<div class="step-active flex items-center justify-between p-gap-md transition-all cursor-default">
+<div class="flex items-center gap-gap-md">
+<span class="font-code-md text-code-md text-primary">01</span>
+<span class="font-body-md text-body-md font-bold text-primary">Movie</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[18px]">adjust</span>
+</div>
+<!-- Step 2: Showtimes -->
+<div class="flex items-center justify-between p-gap-md text-on-surface-variant hover:bg-surface-container-low transition-all cursor-pointer group">
+<div class="flex items-center gap-gap-md">
+<span class="font-code-md text-code-md opacity-40">02</span>
+<span class="font-body-md text-body-md group-hover:text-on-surface">Showtimes</span>
+</div>
+</div>
+<!-- Step 3: Voting -->
+<div class="flex items-center justify-between p-gap-md text-on-surface-variant hover:bg-surface-container-low transition-all cursor-pointer group">
+<div class="flex items-center gap-gap-md">
+<span class="font-code-md text-code-md opacity-40">03</span>
+<span class="font-body-md text-body-md group-hover:text-on-surface">Voting</span>
+</div>
+</div>
+<!-- Step 4: Results -->
+<div class="flex items-center justify-between p-gap-md text-on-surface-variant hover:bg-surface-container-low transition-all cursor-pointer group">
+<div class="flex items-center gap-gap-md">
+<span class="font-code-md text-code-md opacity-40">04</span>
+<span class="font-body-md text-body-md group-hover:text-on-surface">Results</span>
+</div>
+</div>
+<!-- Step 5: Confirmation -->
+<div class="flex items-center justify-between p-gap-md text-on-surface-variant hover:bg-surface-container-low transition-all cursor-pointer group">
+<div class="flex items-center gap-gap-md">
+<span class="font-code-md text-code-md opacity-40">05</span>
+<span class="font-body-md text-body-md group-hover:text-on-surface">Confirmation</span>
+</div>
+</div>
+<!-- Step 6: Attendance -->
+<div class="flex items-center justify-between p-gap-md text-on-surface-variant hover:bg-surface-container-low transition-all cursor-pointer group">
+<div class="flex items-center gap-gap-md">
+<span class="font-code-md text-code-md opacity-40">06</span>
+<span class="font-body-md text-body-md group-hover:text-on-surface">Attendance</span>
+</div>
+</div>
+</div>
+</nav>
+<div class="p-gap-md border-t border-border-strong mt-auto">
+<button class="w-full bg-primary text-background font-bold py-2 rounded flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+<span class="font-label-sm text-label-sm">NEXT STEP</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</aside>
+<!-- Main Workspace -->
+<section class="flex-1 flex flex-col min-w-0 bg-[#070A12]">
+<!-- Admin Header Sub-bar -->
+<div class="p-gap-lg border-b border-border-strong flex justify-between items-center bg-surface/30">
+<div>
+<h1 class="font-headline-md text-headline-md text-primary">Admin Center: Setup Movie Night</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Configure the primary screening selection.</p>
+</div>
+<div class="flex gap-gap-sm">
+<button class="px-4 py-2 border border-border-strong hover:bg-surface-container-high transition-colors text-label-sm font-label-sm">SAVE DRAFT</button>
+</div>
+</div>
+<!-- Content Area: Search & Grid -->
+<div class="flex-1 overflow-y-auto p-gap-lg custom-scrollbar grid grid-cols-1 xl:grid-cols-12 gap-gap-lg">
+<!-- Search and Grid (Left/Center) -->
+<div class="xl:col-span-8 space-y-gap-lg">
+<!-- Search Input -->
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors">search</span>
+<input class="w-full bg-surface-container-lowest border border-border-strong focus:border-primary focus:ring-0 text-primary font-code-md py-4 pl-12 pr-4 transition-all" placeholder="Search movies by title, director, or genre..." type="text"/>
+<div class="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2">
+<kbd class="px-2 py-1 bg-surface-container-high border border-border-strong rounded text-[10px] text-on-surface-variant font-code-md">CMD</kbd>
+<kbd class="px-2 py-1 bg-surface-container-high border border-border-strong rounded text-[10px] text-on-surface-variant font-code-md">K</kbd>
+</div>
+</div>
+<!-- Results Grid -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-gap-md">
+<!-- Movie Card 1 -->
+<div class="group cursor-pointer">
+<div class="relative aspect-[2/3] bg-surface-container-high border border-border-strong overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+<img class="w-full h-full object-cover" data-alt="A cinematic and moody movie poster for a sci-fi thriller featuring a lone figure standing before a massive, glowing celestial gateway. The scene is dominated by deep navy blues and piercing white light, creating a high-contrast and mysterious atmosphere. The aesthetic is clean, modern, and perfectly aligned with a premium dark-themed UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrND1KJkD44ROcyezKnBCoFrpw8av-w7vt5in39AZplhBiGPalOf3oeZJ5_hXNGQaaa8ATcTm8_oHVOJdeFVyzuppxcGgxaHqT_S_6cBdtTv7LgG3rLiCxn1q6m65Mml5B30_PlpxPV6izYCgTPskKvY-FjkFz34kBNA_YxkV_H-S3THU3QRMTuETVF_1DfngjFfA82J7x78BF2gzg7UfLo_w3BkvOQWhESCe-P7-W7E7pYnRNtBzC7FsgJ5ryUqbvgSktDmSM4ivC"/>
+<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<button class="bg-primary text-on-primary px-4 py-2 font-label-sm text-label-sm rounded-full">SELECT</button>
+</div>
+</div>
+<h3 class="mt-2 font-body-md text-body-md font-bold text-on-surface group-hover:text-primary">Neon Horizon</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant">2024 • Sci-Fi</p>
+</div>
+<!-- Movie Card 2 -->
+<div class="group cursor-pointer">
+<div class="relative aspect-[2/3] bg-surface-container-high border border-border-strong overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+<img class="w-full h-full object-cover" data-alt="A vintage-inspired noir movie poster showcasing a rain-slicked city street at night under flickering neon signs. The color palette is restricted to monochrome grays with sharp white highlights and subtle hints of deep blue. The lighting is dramatic, casting long shadows and creating a sense of suspense and classic cinematic elegance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQFt03nVa-DL2nVmr2nyblowcRw-KN5bbOB3_z1u1r-vddt_97oHIm3cd69btYCmXV_42xmOJc-kR6hJJJMOlIstRVTOdW6B5dCngSrWd8cok9lHMUH6Jdty6vSZzkKNePxxz4maDpVNIiDx2XZEXt3tifgMFFafGsO4Eclk2uVZuNvcdiOb99i-Xo9KYQVgwbkbPkw1fxnBmEXYt_435x8yhlfwDwJesCd-2QHc6ipnH9FtWdLysAvrQxbfefG_RGoOlpP34WSgVW"/>
+<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<button class="bg-primary text-on-primary px-4 py-2 font-label-sm text-label-sm rounded-full">SELECT</button>
+</div>
+</div>
+<h3 class="mt-2 font-body-md text-body-md font-bold text-on-surface group-hover:text-primary">The Last Echo</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant">2023 • Noir</p>
+</div>
+<!-- Movie Card 3 -->
+<div class="group cursor-pointer">
+<div class="relative aspect-[2/3] bg-surface-container-high border border-border-strong overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+<img class="w-full h-full object-cover" data-alt="An artistic movie poster depicting a minimalist architectural structure set against a stark, high-contrast sky. The visual style is geometric and rational, using a grayscale palette with deep shadows and brilliant white surfaces. The mood is intellectual and sophisticated, reflecting a premium developer-centric design movement." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkL2ii6UpwUJB6MFtCtPEZzNcjWxN025AcS_RAJnrtUuBLz6YOK6RUdhl5EZY24XVa0Nj_MLbbhfKmCDUNk_8fusDg5gGClLe9k7cD1FLpoNZnACngMkR-RIPE2af8V8pOqzvuul-9K71bj-pnNJfz0TsaxCYtpgU-WgsT_tBaHnncdBFCzmyeDghdt6i1oT-56jqHig0S_l7HECqJihbJSkuZGY481lk-FD6mlwDYtztJXZmfRZqrkBh9qMadVrGSzOJeFtUGjzFC"/>
+<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<button class="bg-primary text-on-primary px-4 py-2 font-label-sm text-label-sm rounded-full">SELECT</button>
+</div>
+</div>
+<h3 class="mt-2 font-body-md text-body-md font-bold text-on-surface group-hover:text-primary">Foundations</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant">2022 • Documentary</p>
+</div>
+<!-- Movie Card 4 -->
+<div class="group cursor-pointer">
+<div class="relative aspect-[2/3] border border-primary overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+<img class="w-full h-full object-cover" data-alt="A modern thriller movie poster featuring a close-up of a digital interface with complex code and data visualizations overlaid on a dark, shadowy figure. The lighting is cool-toned with bright white data streams providing the primary illumination. The aesthetic is tech-focused, precise, and highly detailed, fitting for a movie setup application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAy7zzl1iDaqyvpAZodRi7TGzv15bCKtztl6QtfhBYdGvIZl_WaGGUR_HTgRiwy1KmiQ-cVVgGPb10cdMDPlHq3Y1yFHg2Qtnc0BR_BlM7Y4coxC_eScrzmbl_DLoHzJmJn0lonew-5clap1CTe8pkUnAOSnDXuBwTZ7-u69ymH5Ev8smUqD4YKwNjPfnhCZTAYAWL1FcEfQWEA8DJfDHDruDfAuIFx8rVX4yxrH1Mw8Pw8u3j_bcNBbpowxcOr7Jg-cuzGBZKB7Ms2"/>
+<div class="absolute top-2 right-2 bg-primary text-background px-2 py-1 font-label-sm text-[10px] font-bold">SELECTED</div>
+<div class="absolute inset-0 bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-4xl">check_circle</span>
+</div>
+</div>
+<h3 class="mt-2 font-body-md text-body-md font-bold text-primary">Cyber Nexus</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant">2024 • Tech-Thriller</p>
+</div>
+</div>
+</div>
+<!-- Preview Sidebar (Right) -->
+<div class="xl:col-span-4 space-y-gap-lg">
+<div class="glass-panel p-gap-md sticky top-0">
+<div class="flex items-center justify-between mb-gap-md">
+<h2 class="font-code-md text-code-md text-on-surface-variant">Current Selection</h2>
+<span class="material-symbols-outlined text-success-green">verified</span>
+</div>
+<div class="aspect-video w-full bg-surface-container-high border border-border-strong mb-gap-md relative overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A wide cinematic landscape from the movie Cyber Nexus, showing a futuristic city skyline illuminated by neon light and data streams. The image is crisp and detailed, with a focus on structural alignment and technical precision. The colors are dominated by deep navy and stark white, mirroring the overall UI palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvoHrnX1UJU5XygxxlKxzkRkRdjqPxfXszWg5zVEZsbOi4hJnIYHaGuxmeYUZnreuHn3A6NE5-z94gTzDWawLiTi4sTir99MK_XzTBAHs3tO9qX9--xKL2S6R_nvYlvq6BIu_EKh1cGKSgBc9J3-BCi6nhQLs3a88lg6I_a_oLQuHMLw1yh1MbuDhvCmLMGlWFCNUelf-9v10KrboadcAQwS-onH1PCw9w_dTaYB3FhpEAVN9SF-E6Cib0ufD776DiiUjPspEz8zji"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4">
+<button class="flex items-center gap-2 text-white font-label-sm text-label-sm">
+<span class="material-symbols-outlined">play_circle</span>
+                                    WATCH TRAILER
+                                </button>
+</div>
+</div>
+<div class="space-y-gap-sm">
+<h2 class="font-headline-md text-headline-md text-primary">Cyber Nexus</h2>
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-container-highest text-on-surface px-2 py-1 font-code-md text-[10px] rounded">PG-13</span>
+<span class="bg-surface-container-highest text-on-surface px-2 py-1 font-code-md text-[10px] rounded">2H 14M</span>
+<span class="bg-surface-container-highest text-on-surface px-2 py-1 font-code-md text-[10px] rounded">4K HDR</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+                                In a world where data is the only currency, a rogue archivist discovers a hidden protocol that could rewrite reality itself. A technical masterpiece exploring the boundaries of AI and human consciousness.
+                            </p>
+</div>
+<div class="mt-gap-lg border-t border-border-strong pt-gap-md space-y-4">
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Admin Quality Check</span>
+<span class="text-success-green font-code-md text-label-sm">PASSED</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Availability</span>
+<span class="text-primary font-code-md text-label-sm">GLOBAL</span>
+</div>
+<button class="w-full border border-primary text-primary hover:bg-primary hover:text-background font-bold py-3 transition-all duration-300 font-label-sm text-label-sm tracking-widest">
+                                CONFIRM MOVIE
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer Anchor -->
+<footer class="full-width bottom border-t border-border-strong bg-surface-container-lowest flex flex-col md:flex-row justify-between items-center w-full px-margin-desktop py-gap-lg gap-gap-md z-50">
+<div class="font-code-md text-code-md uppercase tracking-widest text-on-surface-variant">Movie Club // ADMIN</div>
+<div class="flex gap-gap-md">
+<a class="text-on-surface-variant hover:text-primary font-label-sm text-label-sm transition-colors" href="#">Terms</a>
+<a class="text-on-surface-variant hover:text-primary font-label-sm text-label-sm transition-colors" href="#">Privacy</a>
+<a class="text-on-surface-variant hover:text-primary font-label-sm text-label-sm transition-colors" href="#">Discord</a>
+<a class="text-on-surface-variant hover:text-primary font-label-sm text-label-sm transition-colors" href="#">API</a>
+</div>
+<div class="font-label-sm text-label-sm text-secondary">© 2024 Movie Club. Engineered for cinephiles.</div>
+</footer>
+<script>
+        // Micro-interactions for movie selection
+        document.querySelectorAll('.group.cursor-pointer').forEach(card => {
+            card.addEventListener('click', function() {
+                // Remove selected state from others
+                document.querySelectorAll('.group.cursor-pointer .relative').forEach(el => {
+                    el.classList.remove('border-primary');
+                    el.classList.add('border-border-strong');
+                    const badge = el.querySelector('.absolute.top-2');
+                    if(badge) badge.remove();
+                    const check = el.querySelector('.absolute.inset-0 .material-symbols-outlined');
+                    if(check) check.parentElement.remove();
+                });
+
+                // Add selected state
+                const poster = this.querySelector('.relative');
+                poster.classList.remove('border-border-strong');
+                poster.classList.add('border-primary');
+                
+                const badge = document.createElement('div');
+                badge.className = 'absolute top-2 right-2 bg-primary text-background px-2 py-1 font-label-sm text-[10px] font-bold';
+                badge.innerText = 'SELECTED';
+                poster.appendChild(badge);
+
+                const overlay = document.createElement('div');
+                overlay.className = 'absolute inset-0 bg-primary/10 flex items-center justify-center';
+                overlay.innerHTML = '<span class="material-symbols-outlined text-primary text-4xl">check_circle</span>';
+                poster.appendChild(overlay);
+
+                // Update Preview (Simulation)
+                const title = this.querySelector('h3').innerText;
+                document.querySelector('.xl\\:col-span-4 h2.text-primary').innerText = title;
+            });
+        });
+
+        // Search highlight interaction
+        const searchInput = document.querySelector('input[type="text"]');
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+    </script>
+</body></html>
