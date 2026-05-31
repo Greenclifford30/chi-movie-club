@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Movie Club - Admin Showtime Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=JetBrains+Mono:wght@100..800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#353434",
+                        "error-red": "#EF4444",
+                        "primary-fixed-dim": "#c6c6c7",
+                        "inverse-on-surface": "#313030",
+                        "primary": "#ffffff",
+                        "warning-amber": "#F59E0B",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "outline": "#8e9192",
+                        "tertiary-container": "#e2e2e2",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e5e2e1",
+                        "outline-variant": "#444748",
+                        "on-tertiary-container": "#636565",
+                        "border-strong": "#404040",
+                        "on-primary-fixed-variant": "#454747",
+                        "surface-bright": "#3a3939",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "tertiary-fixed": "#e2e2e2",
+                        "primary-container": "#e2e2e2",
+                        "tertiary": "#ffffff",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "secondary-container": "#474746",
+                        "on-primary-container": "#636565",
+                        "surface-container-low": "#1c1b1b",
+                        "primary-fixed": "#e2e2e2",
+                        "on-secondary-container": "#b7b4b4",
+                        "surface-container": "#201f1f",
+                        "secondary": "#c8c6c5",
+                        "surface-container-high": "#2a2a2a",
+                        "on-surface-variant": "#c4c7c8",
+                        "error-container": "#93000a",
+                        "success-green": "#22C55E",
+                        "on-secondary-fixed-variant": "#474746",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-primary-fixed": "#1a1c1c",
+                        "inverse-surface": "#e5e2e1",
+                        "surface": "#141313",
+                        "background": "#141313",
+                        "surface-container-lowest": "#0e0e0e",
+                        "inverse-primary": "#5d5f5f",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "on-primary": "#2f3131",
+                        "info-blue": "#3B82F6",
+                        "surface-dim": "#141313",
+                        "border-subtle": "#262626",
+                        "on-tertiary": "#2f3131",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#353434",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-error": "#690005",
+                        "surface-tint": "#c6c6c7",
+                        "on-secondary": "#313030"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gap-md": "16px",
+                        "margin-desktop": "32px",
+                        "gap-sm": "8px",
+                        "gap-lg": "24px",
+                        "unit": "4px",
+                        "margin-mobile": "16px",
+                        "gap-xs": "4px"
+                    },
+                    "fontFamily": {
+                        "code-md": ["JetBrains Mono"],
+                        "headline-md": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "label-sm": ["JetBrains Mono"],
+                        "body-md": ["Geist"],
+                        "headline-lg": ["Geist"]
+                    },
+                    "fontSize": {
+                        "code-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            background-color: #141313;
+            color: #e5e2e1;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1c1b1b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #404040;
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface sticky top-0 z-50 border-b border-border-strong flex justify-between items-center w-full px-margin-desktop h-16 max-w-full">
+<div class="flex items-center gap-gap-lg">
+<span class="font-headline-md text-headline-md font-bold tracking-tighter text-primary">Movie Club</span>
+<nav class="hidden md:flex gap-gap-md">
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors" href="#">Active Night</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors" href="#">History</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1" href="#">Admin</a>
+</nav>
+</div>
+<div class="flex items-center gap-gap-md">
+<div class="flex items-center gap-gap-xs bg-surface-container-high px-3 py-1 rounded">
+<span class="font-label-sm text-label-sm text-primary uppercase">Admin</span>
+</div>
+<button class="text-on-surface-variant hover:bg-surface-container-highest p-2 rounded transition-all duration-200">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden border border-border-subtle">
+<img alt="User profile avatar" class="h-full w-full object-cover" data-alt="A detailed close-up portrait of a professional male in a modern dark studio setting. The lighting is moody and technical, emphasizing sharp features. The color palette is strictly monochromatic, dominated by deep blacks and cool grays, reflecting a high-end developer-centric UI aesthetic. The background is softly blurred to keep focus on the subject." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHFElARTyzR_NvgME4-w0HfzS23tG7QDhdGRecXTQpzusCtDpmSqYyPxubtZ5ww6dA1PIqfxjT_NvhVwma5VxC7JH6drWtgdH3VC38-9oFFm1yrMBmVCaiFQAaG9xkfkaMe1DSGG3mdZYJdZ-WNtRXihplz3FBcyDWeR0CJdaL1Mc3Gx3_8_qep9nVh7aQa_EWDvwyFo-AJsHpSwUycNLdCC57FUORsrxxl5nGCop18u1M3YycSBy92iCZI3IYiWE21XdD0rNGzqql"/>
+</div>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-gap-lg">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-gap-md mb-gap-lg border-b border-border-subtle pb-gap-md">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-primary mb-1">Showtime Management</h1>
+<p class="text-on-surface-variant font-body-md">Configure cinematic events and manage scheduling metadata.</p>
+</div>
+<div class="flex gap-gap-sm w-full md:w-auto">
+<button class="flex-1 md:flex-none px-4 py-2 border border-border-strong text-primary font-label-sm uppercase tracking-widest hover:bg-surface-container-highest transition-all duration-200 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="file_upload">file_upload</span>
+                    Import Showtimes
+                </button>
+<button class="flex-1 md:flex-none px-4 py-2 bg-primary text-on-primary font-label-sm uppercase tracking-widest hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+                    Quick Draft
+                </button>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gap-lg">
+<!-- Left Panel: Add New Showtime Form -->
+<section class="lg:col-span-5 flex flex-col gap-gap-md">
+<div class="bg-surface-container-lowest border border-border-subtle p-gap-md">
+<h2 class="font-code-md text-code-md text-primary mb-gap-md flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span>
+                        ADD_SHOWTIME_PROCEDURE
+                    </h2>
+<form class="space-y-gap-md">
+<div class="space-y-unit">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase">Theater Name</label>
+<input class="w-full bg-background border border-border-subtle p-3 text-primary font-code-md focus:border-primary focus:ring-0 transition-all outline-none" placeholder="e.g. Grand Zenith Cinema" type="text"/>
+</div>
+<div class="space-y-unit">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase">Location</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]" data-icon="location_on">location_on</span>
+<input class="w-full bg-background border border-border-subtle p-3 pl-10 text-primary font-code-md focus:border-primary focus:ring-0 transition-all outline-none" placeholder="Sector 7, Media District" type="text"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-gap-md">
+<div class="space-y-unit">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase">Date</label>
+<input class="w-full bg-background border border-border-subtle p-3 text-primary font-code-md focus:border-primary focus:ring-0 transition-all outline-none appearance-none" type="date"/>
+</div>
+<div class="space-y-unit">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase">Time</label>
+<input class="w-full bg-background border border-border-subtle p-3 text-primary font-code-md focus:border-primary focus:ring-0 transition-all outline-none appearance-none" type="time"/>
+</div>
+</div>
+<div class="space-y-unit">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase">Format Configuration</label>
+<select class="w-full bg-background border border-border-subtle p-3 text-primary font-code-md focus:border-primary focus:ring-0 transition-all outline-none cursor-pointer">
+<option>IMAX</option>
+<option>Dolby Cinema</option>
+<option>70mm Film</option>
+<option>Standard Digital</option>
+</select>
+</div>
+<div class="pt-gap-sm">
+<button class="w-full bg-primary text-on-primary py-4 font-label-sm uppercase tracking-widest hover:bg-on-background transition-all active:scale-[0.98]" type="submit">
+                                Execute Schedule Entry
+                            </button>
+</div>
+</form>
+</div>
+<!-- Stats / Info Card -->
+<div class="bg-surface-container-low border border-border-subtle p-gap-md border-l-2 border-l-primary">
+<div class="flex items-start gap-gap-md">
+<span class="material-symbols-outlined text-primary" data-icon="info">info</span>
+<div>
+<p class="font-label-sm text-label-sm text-primary uppercase mb-1">Schedule Validation</p>
+<p class="text-on-surface-variant text-body-md">All new showtimes are verified against the club's active screening license. Overlapping entries will trigger a conflict warning.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Panel: Candidate Showtimes -->
+<section class="lg:col-span-7">
+<div class="flex items-center justify-between mb-gap-md">
+<h2 class="font-headline-md text-headline-md text-primary tracking-tight">Candidate Showtimes</h2>
+<div class="flex items-center gap-gap-sm">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Active Queue: 04</span>
+<div class="w-2 h-2 rounded-full bg-success-green animate-pulse"></div>
+</div>
+</div>
+<div class="flex flex-col gap-gap-sm custom-scrollbar max-h-[700px] overflow-y-auto pr-2">
+<!-- Candidate Card 1 -->
+<div class="bg-surface-container border border-border-subtle p-gap-md flex items-center justify-between group hover:border-outline-variant transition-colors">
+<div class="flex items-center gap-gap-md">
+<div class="w-12 h-12 bg-surface-container-highest flex flex-col items-center justify-center border border-border-subtle">
+<span class="font-label-sm text-label-sm text-on-surface-variant">NOV</span>
+<span class="font-headline-md text-headline-md text-primary leading-none">24</span>
+</div>
+<div>
+<h3 class="font-body-lg text-body-lg text-primary font-bold">Interstellar: The IMAX Experience</h3>
+<div class="flex items-center gap-gap-sm mt-1">
+<span class="font-code-md text-code-md text-on-surface-variant">Metropolis Dome</span>
+<span class="text-border-strong">•</span>
+<span class="font-code-md text-code-md text-primary">19:30</span>
+<span class="px-2 py-0.5 bg-surface-container-highest text-primary font-label-sm text-[10px] uppercase tracking-tighter">IMAX</span>
+</div>
+</div>
+</div>
+<div class="flex gap-gap-xs">
+<button class="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-error-red hover:bg-error-container transition-all">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+<!-- Candidate Card 2 -->
+<div class="bg-surface-container border border-border-subtle p-gap-md flex items-center justify-between group hover:border-outline-variant transition-colors">
+<div class="flex items-center gap-gap-md">
+<div class="w-12 h-12 bg-surface-container-highest flex flex-col items-center justify-center border border-border-subtle">
+<span class="font-label-sm text-label-sm text-on-surface-variant">NOV</span>
+<span class="font-headline-md text-headline-md text-primary leading-none">25</span>
+</div>
+<div>
+<h3 class="font-body-lg text-body-lg text-primary font-bold">Oppenheimer</h3>
+<div class="flex items-center gap-gap-sm mt-1">
+<span class="font-code-md text-code-md text-on-surface-variant">Cinestage Heritage</span>
+<span class="text-border-strong">•</span>
+<span class="font-code-md text-code-md text-primary">20:15</span>
+<span class="px-2 py-0.5 bg-surface-container-highest text-primary font-label-sm text-[10px] uppercase tracking-tighter">70MM</span>
+</div>
+</div>
+</div>
+<div class="flex gap-gap-xs">
+<button class="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-error-red hover:bg-error-container transition-all">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+<!-- Candidate Card 3 -->
+<div class="bg-surface-container border border-border-subtle p-gap-md flex items-center justify-between group hover:border-outline-variant transition-colors">
+<div class="flex items-center gap-gap-md">
+<div class="w-12 h-12 bg-surface-container-highest flex flex-col items-center justify-center border border-border-subtle">
+<span class="font-label-sm text-label-sm text-on-surface-variant">NOV</span>
+<span class="font-headline-md text-headline-md text-primary leading-none">28</span>
+</div>
+<div>
+<h3 class="font-body-lg text-body-lg text-primary font-bold">Blade Runner 2049</h3>
+<div class="flex items-center gap-gap-sm mt-1">
+<span class="font-code-md text-code-md text-on-surface-variant">Neon Heights Multiplex</span>
+<span class="text-border-strong">•</span>
+<span class="font-code-md text-code-md text-primary">22:00</span>
+<span class="px-2 py-0.5 bg-surface-container-highest text-primary font-label-sm text-[10px] uppercase tracking-tighter">DOLBY</span>
+</div>
+</div>
+</div>
+<div class="flex gap-gap-xs">
+<button class="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-error-red hover:bg-error-container transition-all">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+<!-- Candidate Card 4 -->
+<div class="bg-surface-container border border-border-subtle p-gap-md flex items-center justify-between group hover:border-outline-variant transition-colors">
+<div class="flex items-center gap-gap-md">
+<div class="w-12 h-12 bg-surface-container-highest flex flex-col items-center justify-center border border-border-subtle">
+<span class="font-label-sm text-label-sm text-on-surface-variant">DEC</span>
+<span class="font-headline-md text-headline-md text-primary leading-none">01</span>
+</div>
+<div>
+<h3 class="font-body-lg text-body-lg text-primary font-bold">Dune: Part Two</h3>
+<div class="flex items-center gap-gap-sm mt-1">
+<span class="font-code-md text-code-md text-on-surface-variant">Sandstorm Cinema</span>
+<span class="text-border-strong">•</span>
+<span class="font-code-md text-code-md text-primary">18:45</span>
+<span class="px-2 py-0.5 bg-surface-container-highest text-primary font-label-sm text-[10px] uppercase tracking-tighter">IMAX</span>
+</div>
+</div>
+</div>
+<div class="flex gap-gap-xs">
+<button class="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-error-red hover:bg-error-container transition-all">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Pagination/Load More Mock -->
+<div class="mt-gap-md text-center">
+<button class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors py-2 px-4 uppercase tracking-widest border border-dashed border-border-subtle w-full">
+                        Fetch Next Buffer (20 Items)
+                    </button>
+</div>
+</section>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest border-t border-border-strong flex flex-col md:flex-row justify-between items-center w-full px-margin-desktop py-gap-lg gap-gap-md mt-gap-lg">
+<div class="flex flex-col items-center md:items-start gap-1">
+<span class="font-code-md text-code-md uppercase tracking-widest text-on-surface-variant">Movie Club // Admin Shell</span>
+<p class="font-body-md text-body-md text-secondary">© 2024 Movie Club. Engineered for cinephiles.</p>
+</div>
+<div class="flex gap-gap-md">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Discord</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">API</a>
+</div>
+</footer>
+<script>
+        // Micro-interaction for form inputs
+        const inputs = document.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                input.parentElement.classList.add('border-primary');
+            });
+            input.addEventListener('blur', () => {
+                input.parentElement.classList.remove('border-primary');
+            });
+        });
+
+        // Simple feedback for action buttons
+        const actionButtons = document.querySelectorAll('button');
+        actionButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                if(btn.type !== 'submit') e.preventDefault();
+                console.log('Action triggered:', btn.innerText || 'Icon Action');
+            });
+        });
+    </script>
+</body></html>

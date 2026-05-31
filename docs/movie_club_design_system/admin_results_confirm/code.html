@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Admin Vote Results | Movie Club</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&amp;family=Geist:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#353434",
+                        "error-red": "#EF4444",
+                        "primary-fixed-dim": "#c6c6c7",
+                        "inverse-on-surface": "#313030",
+                        "primary": "#ffffff",
+                        "warning-amber": "#F59E0B",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "outline": "#8e9192",
+                        "tertiary-container": "#e2e2e2",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e5e2e1",
+                        "outline-variant": "#444748",
+                        "on-tertiary-container": "#636565",
+                        "border-strong": "#404040",
+                        "on-primary-fixed-variant": "#454747",
+                        "surface-bright": "#3a3939",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "tertiary-fixed": "#e2e2e2",
+                        "primary-container": "#e2e2e2",
+                        "tertiary": "#ffffff",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "secondary-container": "#474746",
+                        "on-primary-container": "#636565",
+                        "surface-container-low": "#1c1b1b",
+                        "primary-fixed": "#e2e2e2",
+                        "on-secondary-container": "#b7b4b4",
+                        "surface-container": "#201f1f",
+                        "secondary": "#c8c6c5",
+                        "surface-container-high": "#2a2a2a",
+                        "on-surface-variant": "#c4c7c8",
+                        "error-container": "#93000a",
+                        "success-green": "#22C55E",
+                        "on-secondary-fixed-variant": "#474746",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-primary-fixed": "#1a1c1c",
+                        "inverse-surface": "#e5e2e1",
+                        "surface": "#141313",
+                        "background": "#141313",
+                        "surface-container-lowest": "#0e0e0e",
+                        "inverse-primary": "#5d5f5f",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "on-primary": "#2f3131",
+                        "info-blue": "#3B82F6",
+                        "surface-dim": "#141313",
+                        "border-subtle": "#262626",
+                        "on-tertiary": "#2f3131",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#353434",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-error": "#690005",
+                        "surface-tint": "#c6c6c7",
+                        "on-secondary": "#313030"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gap-md": "16px",
+                        "margin-desktop": "32px",
+                        "gap-sm": "8px",
+                        "gap-lg": "24px",
+                        "unit": "4px",
+                        "margin-mobile": "16px",
+                        "gap-xs": "4px"
+                    },
+                    "fontFamily": {
+                        "code-md": ["JetBrains Mono"],
+                        "headline-md": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "label-sm": ["JetBrains Mono"],
+                        "body-md": ["Geist"],
+                        "headline-lg": ["Geist"]
+                    },
+                    "fontSize": {
+                        "code-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #141313;
+            color: #e5e2e1;
+            font-family: 'Geist', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 16px;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #141313;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #404040;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-surface border-b border-border-strong flex justify-between items-center w-full px-margin-desktop h-16 max-w-full sticky top-0 z-50">
+<div class="flex items-center gap-gap-md">
+<span class="font-headline-md text-headline-md font-bold tracking-tighter text-primary">Movie Club</span>
+<nav class="hidden md:flex gap-gap-md ml-8">
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors font-body-md text-body-md" href="#">Active Night</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors font-body-md text-body-md" href="#">History</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md" href="#">Admin</a>
+</nav>
+</div>
+<div class="flex items-center gap-gap-md">
+<button class="p-2 hover:bg-surface-container-highest transition-all duration-200 rounded-lg">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+</button>
+<button class="p-2 hover:bg-surface-container-highest transition-all duration-200 rounded-lg">
+<span class="material-symbols-outlined text-on-surface-variant">group_add</span>
+</button>
+<div class="h-8 w-px bg-border-strong mx-2"></div>
+<button class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors">Club Switcher</button>
+<div class="flex items-center gap-2 ml-2 cursor-pointer hover:bg-surface-container-highest p-1 rounded transition-all">
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-border-strong overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a young man with a neutral expression, set against a dark, moody background with subtle rim lighting. The style is cinematic and high-contrast, following a monochrome palette with deep blacks and sharp highlights, perfectly aligning with a developer-centric minimalist aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvGiX6hLAwzoXvB9WHH_iyVf0EiX7tdJ8GupQw4HRNWyjwigVA64lEvibjCu1yVndYpCeOwySM33VPtamQ7DZNFedM6Nb4lGXDBEYmoM4hSskIds3jVjclKd7kz0NG4g4XgMX2nr4TBRX8wJI_XE1ftXgH7c721pi5yaryqVibbgXRXi1KTdS5uWeLYc8fsTAQsAnu97Af8156mu8B49lrazyJ_Xv1hYChYOpnq3VhmmWcLmkrwYZjv1xta4Mi6-nd3qZJVXxM70DB"/>
+</div>
+<span class="font-body-md text-body-md font-medium">Profile</span>
+</div>
+</div>
+</header>
+<main class="flex-grow p-margin-desktop max-w-[1400px] mx-auto w-full">
+<!-- Header Section -->
+<div class="mb-gap-lg flex flex-col md:flex-row md:items-end justify-between gap-gap-md">
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-1 block">Session #42 Analysis</span>
+<h1 class="font-headline-lg text-headline-lg text-primary">Vote Results &amp; Confirmation</h1>
+</div>
+<div class="flex gap-gap-sm items-center">
+<span class="flex h-2 w-2 rounded-full bg-success-green animate-pulse"></span>
+<span class="font-code-md text-code-md text-on-surface-variant">Voting Phase Complete (18 Participants)</span>
+</div>
+</div>
+<div class="bento-grid">
+<!-- Suggested Winner Card -->
+<section class="col-span-12 lg:col-span-5 bg-surface-container border border-primary p-gap-md relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[120px]">stars</span>
+</div>
+<div class="relative z-10 h-full flex flex-col">
+<div class="flex justify-between items-start mb-gap-lg">
+<div class="bg-primary text-on-primary px-3 py-1 rounded-sm">
+<span class="font-label-sm text-label-sm font-bold uppercase">Suggested Winner</span>
+</div>
+<div class="text-right">
+<div class="font-headline-md text-headline-md text-primary">14 <span class="text-body-md font-normal text-on-surface-variant">pts</span></div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">4 First-place votes</div>
+</div>
+</div>
+<div class="flex gap-gap-md mb-gap-lg">
+<div class="w-32 h-48 bg-surface-container-high border border-border-strong flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="A cinematic film poster of a classic neo-noir movie featuring a silhouette of a person standing under a single street lamp in a foggy city alleyway. The image is strictly monochromatic, heavy on deep blacks and charcoal tones, with high-density architectural details in the background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAAVWZ3OU05LT9bRgfOV_LrpfHupgd7A9OGYEZnpsn7XChJQIjVDufapfqPMv5_ATVOKy18wC9FE3SxAnkihEWncbpAKY2-pVphxveP8Xb6lQ0ehM4WbL9IPtWfN1pfsNk6-Jcc5Woi9gp7iXT24gz35klXFmqL_Z0zYbf2AtBFTyvFCqBjBOfYqpLAXafXKHfsFC_VgKSoEG5pzyjdgigIetHnj7tXsEt9iWqU-U6pi-0AqTS76gfSVNP8kKze5wi7nDFPYcm-TnVx"/>
+</div>
+<div class="flex flex-col justify-center">
+<h2 class="font-headline-md text-headline-md text-primary mb-1">Blade Runner 2049</h2>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-3">A young blade runner's discovery of a long-buried secret leads him to track down former blade runner Rick Deckard.</p>
+<div class="mt-4 flex flex-wrap gap-2">
+<span class="font-label-sm text-label-sm bg-surface-container-highest px-2 py-1 border border-border-subtle rounded text-on-surface">Sci-Fi</span>
+<span class="font-label-sm text-label-sm bg-surface-container-highest px-2 py-1 border border-border-subtle rounded text-on-surface">164 min</span>
+</div>
+</div>
+</div>
+<div class="mt-auto pt-gap-md border-t border-border-strong">
+<div class="flex items-center gap-gap-sm text-success-green">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+<span class="font-label-sm text-label-sm">Meets quorum requirements</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Detailed Ranked-Choice List -->
+<section class="col-span-12 lg:col-span-7 bg-surface-container border border-border-subtle p-gap-md">
+<div class="flex justify-between items-center mb-gap-md">
+<h3 class="font-headline-md text-headline-md text-primary">Ranked Standings</h3>
+<div class="flex gap-2">
+<button class="p-1 hover:bg-surface-container-highest text-on-surface-variant"><span class="material-symbols-outlined">filter_list</span></button>
+<button class="p-1 hover:bg-surface-container-highest text-on-surface-variant"><span class="material-symbols-outlined">download</span></button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full border-collapse">
+<thead>
+<tr class="bg-surface-container-high border-b border-border-strong">
+<th class="p-3 text-left font-label-sm text-label-sm text-on-surface-variant uppercase">Rank</th>
+<th class="p-3 text-left font-label-sm text-label-sm text-on-surface-variant uppercase">Title</th>
+<th class="p-3 text-center font-label-sm text-label-sm text-on-surface-variant uppercase">P1</th>
+<th class="p-3 text-center font-label-sm text-label-sm text-on-surface-variant uppercase">P2</th>
+<th class="p-3 text-center font-label-sm text-label-sm text-on-surface-variant uppercase">P3</th>
+<th class="p-3 text-right font-label-sm text-label-sm text-on-surface-variant uppercase">Score</th>
+</tr>
+</thead>
+<tbody class="font-code-md text-code-md">
+<tr class="border-b border-border-subtle hover:bg-surface-container-highest transition-colors">
+<td class="p-3 text-primary font-bold">#1</td>
+<td class="p-3 text-primary">Blade Runner 2049</td>
+<td class="p-3 text-center">4</td>
+<td class="p-3 text-center">2</td>
+<td class="p-3 text-center">2</td>
+<td class="p-3 text-right font-bold">14</td>
+</tr>
+<tr class="border-b border-border-subtle hover:bg-surface-container-highest transition-colors">
+<td class="p-3 text-on-surface-variant">#2</td>
+<td class="p-3 text-on-surface">The Grand Budapest Hotel</td>
+<td class="p-3 text-center">3</td>
+<td class="p-3 text-center">3</td>
+<td class="p-3 text-center">1</td>
+<td class="p-3 text-right">12</td>
+</tr>
+<tr class="border-b border-border-subtle hover:bg-surface-container-highest transition-colors">
+<td class="p-3 text-on-surface-variant">#2</td>
+<td class="p-3 text-on-surface">Everything Everywhere All At Once</td>
+<td class="p-3 text-center">2</td>
+<td class="p-3 text-center">4</td>
+<td class="p-3 text-center">1</td>
+<td class="p-3 text-right">12</td>
+</tr>
+<tr class="border-b border-border-subtle hover:bg-surface-container-highest transition-colors">
+<td class="p-3 text-on-surface-variant">#4</td>
+<td class="p-3 text-on-surface">Stalker (1979)</td>
+<td class="p-3 text-center">2</td>
+<td class="p-3 text-center">1</td>
+<td class="p-3 text-center">4</td>
+<td class="p-3 text-right">9</td>
+</tr>
+<tr class="hover:bg-surface-container-highest transition-colors">
+<td class="p-3 text-on-surface-variant">#5</td>
+<td class="p-3 text-on-surface">Parasite</td>
+<td class="p-3 text-center">1</td>
+<td class="p-3 text-center">2</td>
+<td class="p-3 text-center">1</td>
+<td class="p-3 text-right">5</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Tie-Breaker and Analysis Tools -->
+<section class="col-span-12 md:col-span-8 bg-surface-container border border-border-subtle p-gap-md">
+<h3 class="font-headline-md text-headline-md text-primary mb-gap-md">Admin Analysis &amp; Tie-breakers</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gap-md">
+<div class="space-y-4">
+<div>
+<label class="font-label-sm text-label-sm text-on-surface-variant block mb-2 uppercase">Tie-Breaker Rule Applied</label>
+<div class="bg-surface-container-low p-3 border border-border-strong font-body-md text-body-md">
+                                "In event of a point tie, the film with more First-Place (P1) votes takes precedence."
+                            </div>
+</div>
+<div class="p-3 bg-warning-amber/10 border border-warning-amber/30 rounded-sm">
+<div class="flex gap-2 items-center text-warning-amber mb-1">
+<span class="material-symbols-outlined text-sm">warning</span>
+<span class="font-label-sm text-label-sm font-bold">NOTE</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Rank #2 was a point tie. Grand Budapest Hotel placed higher due to 3 P1 votes vs 2 P1 votes.</p>
+</div>
+</div>
+<div>
+<label class="font-label-sm text-label-sm text-on-surface-variant block mb-2 uppercase" for="admin-notes">Tie-Breaker Notes / Manual Override</label>
+<textarea class="w-full bg-surface-container-lowest border border-border-strong rounded-sm p-3 font-code-md text-code-md text-primary focus:ring-1 focus:ring-primary focus:border-primary h-32 outline-none transition-all" id="admin-notes" placeholder="Enter manual adjustments or rationale for override..."></textarea>
+</div>
+</div>
+</section>
+<!-- Confirmation Action Card -->
+<section class="col-span-12 md:col-span-4 bg-surface-container-low border border-border-strong p-gap-md flex flex-col justify-between">
+<div>
+<h3 class="font-headline-md text-headline-md text-primary mb-2">Finalize Event</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-gap-lg">Ready to move from the voting phase to planning the logistics.</p>
+<div class="bg-error-red/10 border border-error-red/20 p-4 mb-gap-lg">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-error-red mt-1">report</span>
+<div>
+<span class="font-label-sm text-label-sm text-error-red font-bold block uppercase">Confirmation Warning</span>
+<p class="font-body-md text-body-md text-on-surface">Confirming will lock voting and move this event to RSVP mode. This action cannot be undone.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="space-y-3">
+<button class="w-full bg-primary text-on-primary py-3 font-headline-md text-headline-md font-bold transition-all active:scale-95 hover:bg-surface-bright flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">event_available</span>
+                        Confirm Showtime
+                    </button>
+<button class="w-full border border-border-strong text-on-surface py-2 font-body-md text-body-md hover:bg-surface-container-highest transition-all">
+                        Reset Voting Window
+                    </button>
+</div>
+</section>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest border-t border-border-strong w-full px-margin-desktop py-gap-lg flex flex-col md:flex-row justify-between items-center gap-gap-md">
+<div class="font-code-md text-code-md uppercase tracking-widest text-on-surface-variant">MOVIE CLUB // OPS</div>
+<div class="text-secondary font-body-md text-body-md text-center md:text-left">
+            © 2024 Movie Club. Engineered for cinephiles.
+        </div>
+<div class="flex gap-gap-md">
+<a class="text-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms</a>
+<a class="text-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy</a>
+<a class="text-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Discord</a>
+<a class="text-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">API</a>
+</div>
+</footer>
+<script>
+        // Micro-interaction for the confirm button
+        document.querySelector('button.bg-primary').addEventListener('click', function() {
+            const originalText = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Processing...';
+            
+            setTimeout(() => {
+                this.innerHTML = '<span class="material-symbols-outlined">check</span> Confirmed';
+                this.classList.replace('bg-primary', 'bg-success-green');
+                this.classList.replace('text-on-primary', 'text-white');
+            }, 1500);
+        });
+
+        // Hover effect for table rows
+        const rows = document.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            row.addEventListener('mouseenter', () => {
+                row.style.borderLeft = '2px solid #ffffff';
+            });
+            row.addEventListener('mouseleave', () => {
+                row.style.borderLeft = 'none';
+            });
+        });
+    </script>
+</body></html>

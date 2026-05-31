@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Movie Night History | Movie Club</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&amp;family=Geist:wght@400;600;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#353434",
+                        "error-red": "#EF4444",
+                        "primary-fixed-dim": "#c6c6c7",
+                        "inverse-on-surface": "#313030",
+                        "primary": "#ffffff",
+                        "warning-amber": "#F59E0B",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "outline": "#8e9192",
+                        "tertiary-container": "#e2e2e2",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e5e2e1",
+                        "outline-variant": "#444748",
+                        "on-tertiary-container": "#636565",
+                        "border-strong": "#404040",
+                        "on-primary-fixed-variant": "#454747",
+                        "surface-bright": "#3a3939",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "tertiary-fixed": "#e2e2e2",
+                        "primary-container": "#e2e2e2",
+                        "tertiary": "#ffffff",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "secondary-container": "#474746",
+                        "on-primary-container": "#636565",
+                        "surface-container-low": "#1c1b1b",
+                        "primary-fixed": "#e2e2e2",
+                        "on-secondary-container": "#b7b4b4",
+                        "surface-container": "#201f1f",
+                        "secondary": "#c8c6c5",
+                        "surface-container-high": "#2a2a2a",
+                        "on-surface-variant": "#c4c7c8",
+                        "error-container": "#93000a",
+                        "success-green": "#22C55E",
+                        "on-secondary-fixed-variant": "#474746",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-primary-fixed": "#1a1c1c",
+                        "inverse-surface": "#e5e2e1",
+                        "surface": "#141313",
+                        "background": "#141313",
+                        "surface-container-lowest": "#0e0e0e",
+                        "inverse-primary": "#5d5f5f",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "on-primary": "#2f3131",
+                        "info-blue": "#3B82F6",
+                        "surface-dim": "#141313",
+                        "border-subtle": "#262626",
+                        "on-tertiary": "#2f3131",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#353434",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-error": "#690005",
+                        "surface-tint": "#c6c6c7",
+                        "on-secondary": "#313030"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gap-md": "16px",
+                        "margin-desktop": "32px",
+                        "gap-sm": "8px",
+                        "gap-lg": "24px",
+                        "unit": "4px",
+                        "margin-mobile": "16px",
+                        "gap-xs": "4px"
+                    },
+                    "fontFamily": {
+                        "code-md": ["JetBrains Mono"],
+                        "headline-md": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "label-sm": ["JetBrains Mono"],
+                        "body-md": ["Geist"],
+                        "headline-lg": ["Geist"]
+                    },
+                    "fontSize": {
+                        "code-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #141313;
+            color: #e5e2e1;
+            font-family: 'Geist', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface border-b border-border-strong docked full-width top-0 sticky z-50">
+<div class="flex justify-between items-center w-full px-margin-desktop h-16 max-w-full">
+<div class="flex items-center gap-gap-lg">
+<span class="font-headline-md text-headline-md font-bold tracking-tighter text-primary">Movie Club</span>
+<nav class="hidden md:flex gap-gap-md">
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors" href="#">Active Night</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1" href="#">History</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors" href="#">Admin</a>
+</nav>
+</div>
+<div class="flex items-center gap-gap-md">
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-highest p-2 rounded-full transition-all">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-highest p-2 rounded-full transition-all">group_add</button>
+<div class="h-8 w-[1px] bg-border-strong mx-2"></div>
+<button class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors">Club Switcher</button>
+<button class="bg-primary text-on-primary font-bold px-4 py-1.5 rounded-DEFAULT active:scale-95 transition-transform font-body-md text-body-md">Profile</button>
+</div>
+</div>
+</header>
+<main class="flex-grow w-full max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-12">
+<!-- Header Section -->
+<div class="mb-12 space-y-2">
+<h1 class="font-headline-lg text-headline-lg text-primary">Movie Night History</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">A chronological record of every cinematic journey the club has embarked on since its inception.</p>
+</div>
+<!-- History Grid -->
+<div class="bento-grid" id="history-grid">
+<!-- Card: Oppenheimer -->
+<div class="bg-surface-container border border-border-subtle p-gap-md hover:border-outline transition-colors group cursor-pointer">
+<div class="flex gap-gap-md">
+<div class="w-24 h-36 bg-surface-container-highest shrink-0 relative overflow-hidden">
+<img alt="Oppenheimer poster thumb" class="w-full h-full object-cover" data-alt="A cinematic, high-contrast close-up of a dramatic film poster silhouette against a fiery orange and deep charcoal sky. The lighting is moody and intense, reflecting a serious historical drama atmosphere. The overall style is professional, minimalist, and perfectly aligned with a premium dark mode movie club application aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPes78gjcByqqBASbuMNh96i2mOyb-AKaKTdqwOuqZUyuFsOCjN0keXWRBjxL934IAaGwuLWi4umttjwhF8z6bLZEr1uwBarRlUfZHYbNq3tZ8a7xMIEFH_FVTDkl0tnoTa7M0OkV2sOaei6Ag0cinAn_A0Lhhdc_LbGXYVpl-myHT7SGElYBkmbsAB-O2cLaNKnn0MJAcSgpbzE3WvaKs5uPpkQAQEkPs5dlTvD5GCYoXJxcCWKLsgceoH8ez23HYgox49GKpqzml"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest/80 to-transparent"></div>
+</div>
+<div class="flex flex-col justify-between py-1">
+<div>
+<div class="flex justify-between items-start">
+<h3 class="font-headline-md text-[20px] text-primary group-hover:text-primary transition-colors">Oppenheimer</h3>
+<span class="bg-success-green/10 text-success-green font-code-md text-xs px-2 py-0.5 rounded border border-success-green/20">You went</span>
+</div>
+<div class="mt-2 space-y-1">
+<p class="font-code-md text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">calendar_today</span> July 21, 2023
+                                </p>
+<p class="font-code-md text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">theater_comedy</span> IMAX Dome Theater
+                                </p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">group</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">15 went</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card: Dune: Part Two -->
+<div class="bg-surface-container border border-border-subtle p-gap-md hover:border-outline transition-colors group cursor-pointer">
+<div class="flex gap-gap-md">
+<div class="w-24 h-36 bg-surface-container-highest shrink-0 relative overflow-hidden">
+<img alt="Dune Part Two poster thumb" class="w-full h-full object-cover" data-alt="A vast desert landscape under a dual sun setting, casting long, dramatic shadows over swirling orange sand dunes. The lighting is ethereal and warm, suggesting an epic sci-fi atmosphere. The visual style is high-fidelity and artistic, maintaining a consistent dark and technical mood for a high-end cinephile platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2nNfz85NZr2Ya4ry5UzJJgj6Gmgd32NwGxra8z_vo1s9PRLk5pqd54hN0RmqNjbiyjHKgXRHiu5ZxntS27ZPRiODbHQ1xAv3T6R1oHe5-s5JpqVHCoVeNGiEIeEhslLEcbStWARaJHDIBhJu3AeXP8dQEuh5TZnf3YSAhcltx-1r-Yr33K3jbJZmpNx0R3oCoe_GZQcXRcx_ezb3jOnImFHMXAkC104Djdu45hhdoWfcQ3eapd5o-EaDAWCRpBt0zQg2_QUO53ukW"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest/80 to-transparent"></div>
+</div>
+<div class="flex flex-col justify-between py-1">
+<div>
+<div class="flex justify-between items-start">
+<h3 class="font-headline-md text-[20px] text-primary group-hover:text-primary transition-colors">Dune: Part Two</h3>
+<span class="bg-success-green/10 text-success-green font-code-md text-xs px-2 py-0.5 rounded border border-success-green/20">You went</span>
+</div>
+<div class="mt-2 space-y-1">
+<p class="font-code-md text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">calendar_today</span> March 1, 2024
+                                </p>
+<p class="font-code-md text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">theater_comedy</span> Grand Cinema Palace
+                                </p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">group</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">22 went</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card: The Boy and the Heron -->
+<div class="bg-surface-container border border-border-subtle p-gap-md hover:border-outline transition-colors group cursor-pointer">
+<div class="flex gap-gap-md">
+<div class="w-24 h-36 bg-surface-container-highest shrink-0 relative overflow-hidden">
+<img alt="The Boy and the Heron poster thumb" class="w-full h-full object-cover" data-alt="A whimsical yet melancholic hand-drawn animation style landscape featuring a lush, magical forest with dappled sunlight breaking through heavy foliage. Soft, painterly textures and a cool, tranquil color palette of deep greens and blues define the scene. It evokes a sense of wonder and high-art cinema consistent with professional animation studio visuals." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQhElfiPn0IGA-qRtWeEv_61gI5rt0tmgK_bp8p4Dt6WurRudPsAzbQPgo_Z-87nD9t3z3vjXEg0ksXO0NF_u00tNTL0HyJRTdel2-X_yu8JujYEWzSPcC71NeN68-XkAqy09Uz_CGF-7RY5yeoCstnTDJ2xM4dKECXWM5SFtIGYC9yxiaOdSdmowZWDbLsri1ThC8NHTDd13bSAmZZnOlWHnzUZXP4IOrVKSEn1yALph9H6j57pEwWmZokONZWWuzpWLlcMM_9jNp"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest/80 to-transparent"></div>
+</div>
+<div class="flex flex-col justify-between py-1">
+<div>
+<div class="flex justify-between items-start">
+<h3 class="font-headline-md text-[20px] text-primary group-hover:text-primary transition-colors">The Boy and the Heron</h3>
+<span class="bg-on-surface-variant/10 text-on-surface-variant font-code-md text-xs px-2 py-0.5 rounded border border-border-strong">Missed</span>
+</div>
+<div class="mt-2 space-y-1">
+<p class="font-code-md text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">calendar_today</span> Dec 8, 2023
+                                </p>
+<p class="font-code-md text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">theater_comedy</span> Art House Loft
+                                </p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">group</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">8 went</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card: Killers of the Flower Moon -->
+<div class="bg-surface-container border border-border-subtle p-gap-md hover:border-outline transition-colors group cursor-pointer">
+<div class="flex gap-gap-md">
+<div class="w-24 h-36 bg-surface-container-highest shrink-0 relative overflow-hidden">
+<img alt="Killers of the Flower Moon poster thumb" class="w-full h-full object-cover" data-alt="A grainy, sepia-toned vintage photograph aesthetic showing an vast open prairie under a heavy, storm-laden sky. The mood is somber and dramatic, with deep shadows and sharp contrasts. The lighting is naturalistic and harsh, reflecting a gritty historical epic style. This image maintains a technical and serious tone for a curated cinema platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCjlXe1yfjp3BOELICJzbeQ6KSol7Wlc130YvEJRooU_K1cVbHMRvtwuPnzdqf9VPKlBu1wrdegNzWO0RAsAoZH6t8BdECz4Fj4ihBmtPTQg7YxFeonONsfJiAnsujMijL7WVirZRoWFEllS21rQgAKvA7tXTeMMzLOmUZljzu9tZx4kkGsWZ3CjArSD9ZfsMxwSM1KaFMMlptHoE2ik3wHthyLqen9vKNWvc2S81CfPXnT6fiyO2ZGYGccqTMrZHt8dr3KM1qV0R5a"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest/80 to-transparent"></div>
+</div>
+<div class="flex flex-col justify-between py-1">
+<div>
+<div class="flex justify-between items-start">
+<h3 class="font-headline-md text-[20px] text-primary group-hover:text-primary transition-colors">Killers of the Flower Moon</h3>
+<span class="bg-success-green/10 text-success-green font-code-md text-xs px-2 py-0.5 rounded border border-success-green/20">You went</span>
+</div>
+<div class="mt-2 space-y-1">
+<p class="font-code-md text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">calendar_today</span> Oct 20, 2023
+                                </p>
+<p class="font-code-md text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">theater_comedy</span> The Plaza Cinema
+                                </p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">group</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">12 went</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Empty State (Hidden by default, shown via JS if grid is empty) -->
+<div class="hidden flex-col items-center justify-center py-32 text-center space-y-6" id="empty-state">
+<div class="w-24 h-24 rounded-full bg-surface-container-high flex items-center justify-center border border-border-strong">
+<span class="material-symbols-outlined text-4xl text-on-surface-variant">movie_filter</span>
+</div>
+<div class="space-y-2">
+<h2 class="font-headline-md text-headline-md text-primary">No History Found</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Your club has not completed any movie nights yet.</p>
+</div>
+<button class="bg-primary text-on-primary font-bold px-6 py-2 rounded-DEFAULT active:scale-95 transition-transform font-body-md">Schedule First Night</button>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest dark:bg-surface-container-lowest border-t border-border-strong full-width bottom mt-auto">
+<div class="flex flex-col md:flex-row justify-between items-center w-full px-margin-desktop py-gap-lg gap-gap-md">
+<span class="font-code-md text-code-md uppercase tracking-widest text-on-surface-variant">© 2024 Movie Club. Engineered for cinephiles.</span>
+<div class="flex gap-gap-lg">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors focus:outline-none ring-1 ring-transparent focus:ring-primary" href="#">Terms</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors focus:outline-none ring-1 ring-transparent focus:ring-primary" href="#">Privacy</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors focus:outline-none ring-1 ring-transparent focus:ring-primary" href="#">Discord</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors focus:outline-none ring-1 ring-transparent focus:ring-primary" href="#">API</a>
+</div>
+</div>
+</footer>
+<script>
+        // Micro-interaction: Card hover focus effect
+        document.querySelectorAll('.bento-grid > div').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-2px)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+            });
+        });
+
+        // Simple logic to toggle empty state (for demo purposes)
+        function toggleEmptyState(isEmpty) {
+            const grid = document.getElementById('history-grid');
+            const empty = document.getElementById('empty-state');
+            if (isEmpty) {
+                grid.classList.add('hidden');
+                empty.classList.remove('hidden');
+                empty.classList.add('flex');
+            } else {
+                grid.classList.remove('hidden');
+                empty.classList.add('hidden');
+                empty.classList.remove('flex');
+            }
+        }
+
+        // To test empty state, uncomment below:
+        // toggleEmptyState(true);
+    </script>
+</body></html>

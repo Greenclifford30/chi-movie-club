@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Movie Club - Active Night</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @font-face {
+            font-family: 'Geist';
+            src: url('https://fonts.cdnfonts.com/css/geist');
+        }
+        body {
+            font-family: 'Geist', sans-serif;
+            background-color: #141313;
+            color: #e5e2e1;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .vote-glow {
+            box-shadow: 0 0 15px 2px rgba(139, 92, 246, 0.3);
+            border-color: rgba(139, 92, 246, 0.6) !important;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "surface-container-highest": "#353434",
+                "error-red": "#EF4444",
+                "primary-fixed-dim": "#c6c6c7",
+                "inverse-on-surface": "#313030",
+                "primary": "#ffffff",
+                "warning-amber": "#F59E0B",
+                "secondary-fixed-dim": "#c8c6c5",
+                "outline": "#8e9192",
+                "tertiary-container": "#e2e2e2",
+                "on-error-container": "#ffdad6",
+                "on-background": "#e5e2e1",
+                "outline-variant": "#444748",
+                "on-tertiary-container": "#636565",
+                "border-strong": "#404040",
+                "on-primary-fixed-variant": "#454747",
+                "surface-bright": "#3a3939",
+                "on-tertiary-fixed-variant": "#454747",
+                "tertiary-fixed": "#e2e2e2",
+                "primary-container": "#e2e2e2",
+                "tertiary": "#ffffff",
+                "on-surface": "#e5e2e1",
+                "on-secondary-fixed": "#1c1b1b",
+                "secondary-container": "#474746",
+                "on-primary-container": "#636565",
+                "surface-container-low": "#1c1b1b",
+                "primary-fixed": "#e2e2e2",
+                "on-secondary-container": "#b7b4b4",
+                "surface-container": "#201f1f",
+                "secondary": "#c8c6c5",
+                "surface-container-high": "#2a2a2a",
+                "on-surface-variant": "#c4c7c8",
+                "error-container": "#93000a",
+                "success-green": "#22C55E",
+                "on-secondary-fixed-variant": "#474746",
+                "secondary-fixed": "#e5e2e1",
+                "on-primary-fixed": "#1a1c1c",
+                "inverse-surface": "#e5e2e1",
+                "surface": "#141313",
+                "background": "#141313",
+                "surface-container-lowest": "#0e0e0e",
+                "inverse-primary": "#5d5f5f",
+                "tertiary-fixed-dim": "#c6c6c7",
+                "on-primary": "#2f3131",
+                "info-blue": "#3B82F6",
+                "surface-dim": "#141313",
+                "border-subtle": "#262626",
+                "on-tertiary": "#2f3131",
+                "error": "#ffb4ab",
+                "surface-variant": "#353434",
+                "on-tertiary-fixed": "#1a1c1c",
+                "on-error": "#690005",
+                "surface-tint": "#c6c6c7",
+                "on-secondary": "#313030"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+              },
+              "spacing": {
+                "gap-md": "16px",
+                "margin-desktop": "32px",
+                "gap-sm": "8px",
+                "gap-lg": "24px",
+                "unit": "4px",
+                "margin-mobile": "16px",
+                "gap-xs": "4px"
+              },
+              "fontFamily": {
+                "code-md": ["JetBrains Mono"],
+                "headline-md": ["Geist"],
+                "body-lg": ["Geist"],
+                "label-sm": ["JetBrains Mono"],
+                "body-md": ["Geist"],
+                "headline-lg": ["Geist"]
+              },
+              "fontSize": {
+                "code-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                "body-lg": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col selection:bg-primary selection:text-surface">
+<!-- TopAppBar -->
+<header class="docked full-width top-0 z-50 bg-surface border-b border-border-strong flex justify-between items-center w-full px-margin-desktop h-16 max-w-full">
+<div class="flex items-center gap-gap-lg">
+<span class="font-headline-md text-headline-md font-bold tracking-tighter text-primary">Movie Club</span>
+<nav class="hidden md:flex gap-gap-md items-center">
+<a class="font-body-md text-body-md text-primary font-bold border-b-2 border-primary pb-1" href="#">Active Night</a>
+<a class="font-body-md text-body-md text-on-surface-variant font-medium hover:text-on-surface transition-colors" href="#">History</a>
+<a class="font-body-md text-body-md text-on-surface-variant font-medium hover:text-on-surface transition-colors" href="#">Admin</a>
+</nav>
+</div>
+<div class="flex items-center gap-gap-md">
+<button class="hover:bg-surface-container-highest p-2 transition-all duration-200 rounded-lg">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+</button>
+<button class="hover:bg-surface-container-highest p-2 transition-all duration-200 rounded-lg">
+<span class="material-symbols-outlined text-on-surface-variant">group_add</span>
+</button>
+<div class="h-6 w-[1px] bg-border-strong mx-2"></div>
+<button class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors">Club Switcher</button>
+<div class="flex items-center gap-gap-sm ml-2 p-1 hover:bg-surface-container-highest transition-all duration-200 rounded cursor-pointer">
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden border border-border-strong">
+<img alt="User profile avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB4_PrzVJ9qXrnnLAja0zfG1kuHwSSXsRF14IZiC0hC7jGm9Iwsh7Ey5yXfsuq9_Yav4fzPGfazkQPT9NviX8qp9G1jyhVxd52PxItXwhY-VtuRZSD0kFhI9rx4U_kghWlfPcwaKhvSNYGTKrLn2gPeK0kp2_CHyBp_m9fLEpN-37M7iZHN844UaGDj8g0v2G3_ZHzfHHBg3Jzyt9ZtMoUcCdL6CRtefL5ElklfbyQN83RmOaNgiSXifJRJ3Y2CT4fsKg6wOI5dXkef"/>
+</div>
+<span class="font-body-md text-body-md text-on-surface">Profile</span>
+</div>
+</div>
+</header>
+<main class="flex-grow w-full max-w-7xl mx-auto px-margin-desktop py-gap-lg space-y-gap-lg">
+<!-- Confirmation Banner -->
+<section class="animate-in fade-in slide-in-from-top duration-500">
+<div class="bg-success-green/10 border border-success-green/30 px-6 py-4 flex items-center justify-between rounded-lg backdrop-blur-sm">
+<div class="flex items-center gap-gap-md">
+<div class="bg-success-green p-1.5 rounded-full">
+<span class="material-symbols-outlined text-surface text-sm font-bold">check</span>
+</div>
+<div>
+<p class="font-body-lg text-body-lg text-success-green font-semibold">Vote saved.</p>
+<p class="font-body-md text-body-md text-on-surface-variant">You can edit it until voting closes in 4h 12m.</p>
+</div>
+</div>
+<button class="px-4 py-2 bg-surface-container-highest text-primary border border-border-strong hover:bg-primary hover:text-surface transition-all duration-200 font-label-sm text-label-sm uppercase tracking-widest active:scale-95" onclick="toggleEdit()">
+                    Edit Vote
+                </button>
+</div>
+</section>
+<!-- Header Information -->
+<div class="flex flex-col md:flex-row justify-between items-end gap-gap-md">
+<div>
+<span class="font-code-md text-code-md text-on-surface-variant uppercase tracking-widest">Active Session #204</span>
+<h1 class="font-headline-lg text-headline-lg text-primary mt-2">Dune: Part Two (2024) Selection</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">IMAX Victoria Gardens · Hosted by @alex_c</p>
+</div>
+<div class="flex gap-gap-sm">
+<div class="flex flex-col items-end">
+<span class="font-label-sm text-label-sm text-on-surface-variant">VOTING ENDS AT</span>
+<span class="font-code-md text-code-md text-warning-amber">22:00 PM EST</span>
+</div>
+</div>
+</div>
+<!-- Saved Votes Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gap-md" id="vote-grid">
+<!-- Main Choice (Primary Slot) -->
+<div class="md:col-span-8 group relative bg-surface-container-low border border-border-subtle p-6 transition-all duration-500 vote-glow">
+<div class="absolute top-4 right-4 flex items-center gap-2">
+<span class="bg-primary/10 text-primary border border-primary/20 px-3 py-1 font-code-md text-code-md rounded">Primary Choice</span>
+<span class="material-symbols-outlined text-success-green" data-weight="fill">verified</span>
+</div>
+<div class="flex flex-col md:flex-row gap-gap-lg">
+<div class="w-full md:w-48 aspect-[2/3] overflow-hidden rounded-lg border border-border-strong">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" data-alt="A cinematic IMAX poster for a science fiction epic, showing a vast desert landscape under a dual sun. The lighting is harsh and dramatic with golden sand dunes stretching into the distance. The style is hyper-minimalist with a focus on scale and atmospheric depth, using a monochromatic amber and deep charcoal color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPOh_R-dcRoBMnE7zEGN1fJ00ohR-ISuez3EpFa2pqgEAMolk7VLuy3_rNLwYE5MvIj94JbDPFxN8is372IV_zAbqpgob1CQPTgOACDvUARnm82GUfyclzKn2Br4DyRsdlVsso22Tpwk0O-brOOGh9lVu1iB1LfkJipIZ1nCgek57OoDHVm5NWdaD5Afh6ONnCFDZv_-3X92kOPZMhgBVJ_IElBgM7IICTjWIChuUfSvfZUIJxk5I1WFBEtJk5GCNdESdCp9-r6aUw"/>
+</div>
+<div class="flex-grow flex flex-col justify-center">
+<h2 class="font-headline-md text-headline-md text-primary mb-2">Friday Night Premier</h2>
+<div class="grid grid-cols-2 gap-gap-md">
+<div class="border-l border-border-strong pl-4">
+<p class="font-label-sm text-label-sm text-on-surface-variant">TIME</p>
+<p class="font-code-md text-code-md text-primary">19:30</p>
+</div>
+<div class="border-l border-border-strong pl-4">
+<p class="font-label-sm text-label-sm text-on-surface-variant">ROW / SEAT</p>
+<p class="font-code-md text-code-md text-primary">H-12, H-13</p>
+</div>
+</div>
+<div class="mt-6 p-3 bg-surface border border-border-strong flex items-center gap-gap-sm">
+<span class="material-symbols-outlined text-info-blue">confirmation_number</span>
+<span class="font-body-md text-body-md">2 Tickets Requested</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Secondary Choice -->
+<div class="md:col-span-4 bg-surface-container-low border border-border-subtle p-6 transition-all duration-500 vote-glow flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-4">
+<span class="font-code-md text-code-md text-on-surface-variant">Backup Slot</span>
+<span class="material-symbols-outlined text-success-green" data-weight="fill">check_circle</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-primary">Saturday Matinee</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">14:15 PM · Screen 4</p>
+</div>
+<div class="mt-8 space-y-2">
+<div class="flex justify-between font-code-md text-code-md">
+<span class="text-on-surface-variant">Availability</span>
+<span class="text-success-green">High</span>
+</div>
+<div class="w-full h-1 bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-success-green w-4/5"></div>
+</div>
+</div>
+</div>
+<!-- Tertiary Choice -->
+<div class="md:col-span-4 bg-surface-container-low border border-border-subtle p-6 transition-all duration-500 vote-glow">
+<div class="flex justify-between items-start mb-4">
+<span class="font-code-md text-code-md text-on-surface-variant">Third Priority</span>
+<span class="material-symbols-outlined text-success-green" data-weight="fill">check_circle</span>
+</div>
+<h3 class="font-body-lg text-body-lg font-bold text-primary">Sunday Late Show</h3>
+<p class="font-code-md text-code-md text-on-surface-variant mt-1">21:00 PM · Standard</p>
+<div class="mt-4 flex flex-wrap gap-2">
+<span class="px-2 py-0.5 bg-surface-container-highest text-on-surface-variant font-code-md text-[10px] uppercase tracking-tighter">Quiet Crowd</span>
+<span class="px-2 py-0.5 bg-surface-container-highest text-on-surface-variant font-code-md text-[10px] uppercase tracking-tighter">Recliner Seats</span>
+</div>
+</div>
+<!-- Voting Stats Widget -->
+<div class="md:col-span-8 bg-surface-container-lowest border border-border-strong border-dashed p-6 flex flex-col md:flex-row items-center justify-between gap-gap-md">
+<div class="flex items-center gap-gap-md">
+<div class="flex -space-x-3">
+<img alt="Member" class="w-10 h-10 rounded-full border-2 border-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsxS7oQhAASR996S15Sr3lA1KsUF0SfcfZB8VlWN7uu384WEl7T_--1H-AxrM61rQKkuLAyWt9YAMSzBw7iQtY9ZG_88CRoiE8AIsQ7goP1oKA0xGu4p1tbJG5OqMZ2HwwUq1dnF4T9BV0ie5LfZQMxoxmeEJUfBcoBhpdmW1rsHMJg9ZIWMzaQvqLh1qaWRMZrL79fCgsUotMJ4njd1PhF6mOxd4UxYmBVtD0nwDtSKmC-1nZzLDfpGKN1XfoAqiFaxA9Cm0Bv_q_"/>
+<img alt="Member" class="w-10 h-10 rounded-full border-2 border-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAM71kv6ASZR1IYQoAtaYwt0VuYy6lX3K3G-hiRsctMSTGq9Ocx1mqRQoQg-Us8hJwCyp8zKZlINMyBEW8wQoTlVkIrXTkM2UOkPURNv0a06VEk16vzDCwVMBzsQ2AxSkZPwAfgwpeCovbJQOFKrC427skC09X2BAZtd7No6P71TrKw8HqKJqDZyhzRVNw6wHfmN7BE9AHO4iTgCF39JAE23S1OWKwV3ksAl72OgE8W3XDZxtgk6giBSJuMAqhwfmK4mKJMxToPhSwO"/>
+<img alt="Member" class="w-10 h-10 rounded-full border-2 border-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwtXuq9eiFnDorV3dPP0WuF0i-0Cc-bXLh91A_IOmVvlJZOPghO6vHSldudzbR1rkOw6CeEDqg-m2PlEg-fTT0WqP66zqgbIvIDcB1w8o3gDO0rPW0b75r-wNFzX3e7Cu57zF-OJQNp7PuxEbUnLwRK-aGuQYBb07zsRs-kIiWIf_ZEnd4Abm_ZH5ek8cCsJVaqEHHeHz4nd20PMjQOaa1K9uV4vHelRg8O0LqNtp2V-FwPTOT1VY96LelDpKUQGFJE5-wbnKXD1Ew"/>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest border-2 border-surface flex items-center justify-center font-code-md text-label-sm">+8</div>
+</div>
+<div>
+<p class="font-body-md text-body-md text-primary">12 members have voted</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">Current Consensus: Friday Night</p>
+</div>
+</div>
+<div class="flex items-center gap-gap-sm">
+<span class="material-symbols-outlined text-on-surface-variant">group</span>
+<span class="font-code-md text-code-md">80% Participation</span>
+</div>
+</div>
+</div>
+<!-- Discussion/Logs (Minimalist Section) -->
+<section class="space-y-gap-sm">
+<h4 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+<span class="w-2 h-2 bg-info-blue rounded-full"></span>
+                Member Notes
+            </h4>
+<div class="bg-surface-container-low border border-border-subtle divide-y divide-border-subtle">
+<div class="p-4 flex gap-gap-md items-start">
+<span class="font-code-md text-code-md text-on-surface-variant shrink-0">14:02</span>
+<div class="space-y-1">
+<p class="font-body-md text-body-md"><span class="text-primary font-bold">Marcus_V:</span> I can only make the Friday night slot. If Saturday wins, I'll catch the next one.</p>
+</div>
+</div>
+<div class="p-4 flex gap-gap-md items-start">
+<span class="font-code-md text-code-md text-on-surface-variant shrink-0">12:50</span>
+<div class="space-y-1">
+<p class="font-body-md text-body-md"><span class="text-primary font-bold">Sarah.Dev:</span> Updated my vote to prioritize IMAX. Friday's looking good!</p>
+</div>
+</div>
+<div class="p-4 bg-surface-container-lowest">
+<input class="w-full bg-transparent border-none focus:ring-0 font-body-md text-body-md text-on-surface-variant placeholder:text-on-surface-variant/50" placeholder="Add a comment or preference..." type="text"/>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="full-width bottom bg-surface-container-lowest border-t border-border-strong mt-gap-lg">
+<div class="flex flex-col md:flex-row justify-between items-center w-full px-margin-desktop py-gap-lg gap-gap-md">
+<span class="font-code-md text-code-md uppercase tracking-widest text-on-surface-variant">Movie Club // Build.0.9.4</span>
+<div class="flex gap-gap-lg">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Discord</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">API</a>
+</div>
+<p class="font-label-sm text-label-sm text-secondary">© 2024 Movie Club. Engineered for cinephiles.</p>
+</div>
+</footer>
+<script>
+        function toggleEdit() {
+            const gridItems = document.querySelectorAll('.vote-glow');
+            const button = event.currentTarget;
+            
+            if (button.innerText === 'EDIT VOTE') {
+                button.innerText = 'SAVE VOTE';
+                button.classList.remove('bg-surface-container-highest');
+                button.classList.add('bg-primary', 'text-surface');
+                
+                gridItems.forEach(item => {
+                    item.classList.remove('vote-glow');
+                    item.classList.add('border-primary', 'ring-1', 'ring-primary/20');
+                    item.style.cursor = 'pointer';
+                });
+                
+                // Show visual feedback for "editable"
+                const banner = button.closest('div');
+                banner.classList.remove('bg-success-green/10', 'border-success-green/30');
+                banner.classList.add('bg-warning-amber/10', 'border-warning-amber/30');
+                banner.querySelector('.font-semibold').innerText = 'Editing Vote...';
+                banner.querySelector('.font-semibold').classList.replace('text-success-green', 'text-warning-amber');
+                banner.querySelector('.bg-success-green').classList.replace('bg-success-green', 'bg-warning-amber');
+            } else {
+                window.location.reload(); // Simple mock behavior for "saving"
+            }
+        }
+
+        // Lightweight hover effect for grid items
+        document.querySelectorAll('.md\\:col-span-4, .md\\:col-span-8').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.setProperty('--mouse-x', `${x}px`);
+                card.style.setProperty('--mouse-y', `${y}px`);
+            });
+        });
+    </script>
+</body></html>
