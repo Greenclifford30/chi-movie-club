@@ -3,6 +3,7 @@
 import type {
   ActiveMovieNightResponse,
   ApiErrorBody,
+  CachedShowtime,
   Club,
   ClubInvite,
   ClubMembership,
@@ -165,6 +166,38 @@ export function refreshGracenote(
     token,
     "/admin/showtimes/gracenote/refresh",
     { method: "POST", body: JSON.stringify(body) }
+  );
+}
+
+export function searchGracenoteShowtimes(
+  token: string,
+  params: {
+    title: string;
+    zip: string;
+    radius: number;
+    numDays: number;
+    units: "mi" | "km";
+    provider?: string;
+    providerMovieId?: string;
+  }
+) {
+  const searchParams = new URLSearchParams({
+    title: params.title,
+    zip: params.zip,
+    radius: String(params.radius),
+    numDays: String(params.numDays),
+    units: params.units,
+  });
+  if (params.provider) {
+    searchParams.set("provider", params.provider);
+  }
+  if (params.providerMovieId) {
+    searchParams.set("providerMovieId", params.providerMovieId);
+  }
+
+  return apiFetch<{ showtimes: CachedShowtime[] }>(
+    token,
+    `/admin/showtimes/gracenote/search?${searchParams}`
   );
 }
 

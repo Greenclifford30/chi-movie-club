@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import {
+  addShowtimes,
   confirmShowtime,
   createClubInvites,
   createMovieNight,
@@ -20,12 +21,15 @@ import {
   listClubInvites,
   MovieClubApiError,
   refreshGracenote,
+  searchGracenoteShowtimes,
   searchMovies,
 } from "@/lib/movie-club-api";
 import { formatDate, formatTime, posterUrl, showtimeDateTime, showtimeLabel } from "@/lib/movie-club-format";
-import type { ActiveMovieNightResponse, ClubInvite, MovieSnapshot, Showtime, VoteResults } from "@/lib/movie-club-types";
+import type { ActiveMovieNightResponse, CachedShowtime, ClubInvite, MovieSnapshot, Showtime, VoteResults } from "@/lib/movie-club-types";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+type LoadState = "idle" | "loading" | "error";
+type GracenoteSearchForm = { zip: string; radius: number; numDays: number; units: "mi" | "km" };
 
 const setupSteps = [
   { label: "Movie", icon: Clapperboard },
@@ -48,7 +52,11 @@ export default function ClubAdminPage() {
   const [selectedMovie, setSelectedMovie] = useState<MovieSnapshot | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetDate, setTargetDate] = useState(today);
-  const [refreshForm, setRefreshForm] = useState({ zip: "60422", radius: 30, numDays: 14, units: "mi" as const });
+  const [refreshForm, setRefreshForm] = useState<GracenoteSearchForm>({ zip: "60422", radius: 30, numDays: 14, units: "mi" });
+  const [cachedShowtimes, setCachedShowtimes] = useState<CachedShowtime[]>([]);
+  const [selectedCachedKeys, setSelectedCachedKeys] = useState<string[]>([]);
+  const [gracenoteState, setGracenoteState] = useState<LoadState>("idle");
+  const [importState, setImportState] = useState<SaveState>("idle");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,9 +69,14 @@ export default function ClubAdminPage() {
       const nextActive = await getActiveMovieNight(token, clubId);
       setActive(nextActive);
       setSelectedMovie(nextActive.movieNight.movie);
-      if (nextActive.movieNight.status === "voting" || nextActive.movieNight.status === "confirmed") {
+      if (
+        nextActive.showtimes.length &&
+        (nextActive.movieNight.status === "voting" || nextActive.movieNight.status === "confirmed")
+      ) {
         const nextResults = await getVoteResults(token, nextActive.movieNight.movieNightId);
         setResults(nextResults);
+      } else {
+        setResults(null);
       }
     } catch (activeError) {
       setActive(null);
@@ -167,6 +180,68 @@ export default function ClubAdminPage() {
       setSaveState("error");
       setError(refreshError instanceof Error ? refreshError.message : "Unable to queue Gracenote refresh.");
     }
+  }
+
+  async function handleSearchGracenote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !movieNight?.movie) {
+      setError("Create a movie night before searching cached showtimes.");
+      return;
+    }
+
+    setGracenoteState("loading");
+    setCachedShowtimes([]);
+    setSelectedCachedKeys([]);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await searchGracenoteShowtimes(token, {
+        title: movieNight.movie.title,
+        provider: movieNight.movie.provider,
+        providerMovieId: movieNight.movie.externalId,
+        zip: refreshForm.zip,
+        radius: refreshForm.radius,
+        numDays: refreshForm.numDays,
+        units: refreshForm.units,
+      });
+      setCachedShowtimes(result.showtimes);
+      setGracenoteState("idle");
+      setMessage(result.showtimes.length ? `${result.showtimes.length} cached showtime${result.showtimes.length === 1 ? "" : "s"} found.` : "No cached Gracenote showtimes found for this movie and window.");
+    } catch (searchError) {
+      setGracenoteState("error");
+      setError(searchError instanceof Error ? searchError.message : "Unable to search cached Gracenote showtimes.");
+    }
+  }
+
+  async function handleImportShowtimes() {
+    if (!token || !movieNight || !selectedCachedKeys.length) {
+      return;
+    }
+
+    const cachedShowtimeKeys = cachedShowtimes
+      .filter((showtime) => selectedCachedKeys.includes(cacheKey(showtime)))
+      .map((showtime) => ({ PK: showtime.PK, SK: showtime.SK }));
+
+    setImportState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      await addShowtimes(token, movieNight.movieNightId, { cachedShowtimeKeys });
+      setImportState("saved");
+      setSelectedCachedKeys([]);
+      setMessage(`${cachedShowtimeKeys.length} showtime${cachedShowtimeKeys.length === 1 ? "" : "s"} imported. Voting is open once the backend updates the movie night status.`);
+      await loadActive();
+    } catch (importError) {
+      setImportState("error");
+      setError(importError instanceof Error ? importError.message : "Unable to import selected showtimes.");
+    }
+  }
+
+  function toggleCachedShowtime(showtime: CachedShowtime) {
+    const key = cacheKey(showtime);
+    setSelectedCachedKeys((current) =>
+      current.includes(key) ? current.filter((selectedKey) => selectedKey !== key) : [...current, key]
+    );
   }
 
   async function handleConfirm(showtimeId: string) {
@@ -325,29 +400,19 @@ export default function ClubAdminPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-slate-900/80 py-6">
-              <CardHeader>
-                <h2 className="font-semibold text-white">Gracenote refresh</h2>
-                <p className="text-sm text-slate-400">Queues server-side cache ingestion.</p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Field label="ZIP">
-                  <Input value={refreshForm.zip} onChange={(event) => setRefreshForm((current) => ({ ...current, zip: event.target.value }))} className="border-white/10 bg-white/5 text-white" />
-                </Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Radius">
-                    <Input type="number" value={refreshForm.radius} onChange={(event) => setRefreshForm((current) => ({ ...current, radius: Number(event.target.value) }))} className="border-white/10 bg-white/5 text-white" />
-                  </Field>
-                  <Field label="Days">
-                    <Input type="number" value={refreshForm.numDays} onChange={(event) => setRefreshForm((current) => ({ ...current, numDays: Number(event.target.value) }))} className="border-white/10 bg-white/5 text-white" />
-                  </Field>
-                </div>
-                <Button onClick={handleRefreshGracenote} disabled={saveState === "saving"} className="w-full bg-cyan-500 text-slate-950 hover:bg-cyan-400">
-                  <RefreshCcw className="size-4" />
-                  Queue refresh
-                </Button>
-              </CardContent>
-            </Card>
+            <GracenoteImportPanel
+              cachedShowtimes={cachedShowtimes}
+              form={refreshForm}
+              gracenoteState={gracenoteState}
+              importState={importState}
+              movieNightExists={Boolean(movieNight)}
+              onImport={handleImportShowtimes}
+              onRefresh={handleRefreshGracenote}
+              onSearch={handleSearchGracenote}
+              onToggle={toggleCachedShowtime}
+              selectedKeys={selectedCachedKeys}
+              setForm={setRefreshForm}
+            />
 
             <Card className="border-white/10 bg-slate-900/80 py-6">
               <CardHeader>
@@ -423,6 +488,112 @@ function MovieGrid({
   );
 }
 
+function GracenoteImportPanel({
+  cachedShowtimes,
+  form,
+  gracenoteState,
+  importState,
+  movieNightExists,
+  onImport,
+  onRefresh,
+  onSearch,
+  onToggle,
+  selectedKeys,
+  setForm,
+}: {
+  cachedShowtimes: CachedShowtime[];
+  form: { zip: string; radius: number; numDays: number; units: "mi" | "km" };
+  gracenoteState: LoadState;
+  importState: SaveState;
+  movieNightExists: boolean;
+  onImport: () => void;
+  onRefresh: () => void;
+  onSearch: (event: FormEvent<HTMLFormElement>) => void;
+  onToggle: (showtime: CachedShowtime) => void;
+  selectedKeys: string[];
+  setForm: (form: { zip: string; radius: number; numDays: number; units: "mi" | "km" }) => void;
+}) {
+  const selectedCount = selectedKeys.length;
+
+  return (
+    <Card className="border-white/10 bg-slate-900/80 py-6">
+      <CardHeader>
+        <h2 className="font-semibold text-white">Gracenote import</h2>
+        <p className="text-sm text-slate-400">Refresh the cache, search matching showtimes, then import candidates for voting.</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <form onSubmit={onSearch} className="space-y-3">
+          <Field label="ZIP">
+            <Input value={form.zip} onChange={(event) => setForm({ ...form, zip: event.target.value })} className="border-white/10 bg-white/5 text-white" />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Radius">
+              <Input type="number" min={1} value={form.radius} onChange={(event) => setForm({ ...form, radius: Number(event.target.value) })} className="border-white/10 bg-white/5 text-white" />
+            </Field>
+            <Field label="Days">
+              <Input type="number" min={1} value={form.numDays} onChange={(event) => setForm({ ...form, numDays: Number(event.target.value) })} className="border-white/10 bg-white/5 text-white" />
+            </Field>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button type="button" onClick={onRefresh} disabled={!movieNightExists || importState === "saving"} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+              <RefreshCcw className="size-4" />
+              Queue refresh
+            </Button>
+            <Button type="submit" disabled={!movieNightExists || gracenoteState === "loading"} className="bg-violet-500 text-white hover:bg-violet-600">
+              {gracenoteState === "loading" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+              Search cache
+            </Button>
+          </div>
+        </form>
+
+        {!movieNightExists ? (
+          <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">Create a movie night before importing showtimes.</p>
+        ) : cachedShowtimes.length ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-slate-400">{cachedShowtimes.length} cached showtimes</span>
+              <span className="text-cyan-200">{selectedCount} selected</span>
+            </div>
+            <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+              {cachedShowtimes.map((showtime) => {
+                const key = cacheKey(showtime);
+                const dateTime = cachedShowtimeDateTime(showtime);
+                const isSelected = selectedKeys.includes(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => onToggle(showtime)}
+                    className={`w-full rounded-lg border p-3 text-left transition ${isSelected ? "border-cyan-300/60 bg-cyan-400/10" : "border-white/10 bg-white/5 hover:border-white/25"}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input type="checkbox" checked={isSelected} readOnly className="mt-1 size-4 accent-cyan-300" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-white">{showtime.theaterName}</p>
+                        <p className="mt-1 text-sm text-slate-300">{formatDate(dateTime)} at {formatTime(dateTime)}</p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                          <span className="rounded bg-cyan-400/10 px-2 py-1 text-cyan-100">{showtime.screenFormat || "Standard"}</span>
+                          <span className="rounded bg-white/5 px-2 py-1 text-slate-300">{showtime.theaterLocation || "Chicago area"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <Button onClick={onImport} disabled={!selectedCount || importState === "saving"} className="w-full bg-green-500 text-slate-950 hover:bg-green-400">
+              {importState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+              Import selected
+            </Button>
+          </div>
+        ) : (
+          <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">No cached showtimes loaded yet.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function AdminShowtimes({ showtimes }: { showtimes: Showtime[] }) {
   return (
     <Card className="border-white/10 bg-slate-900/80 py-6">
@@ -447,6 +618,14 @@ function AdminShowtimes({ showtimes }: { showtimes: Showtime[] }) {
       </CardContent>
     </Card>
   );
+}
+
+function cacheKey(showtime: CachedShowtime) {
+  return `${showtime.PK}::${showtime.SK}`;
+}
+
+function cachedShowtimeDateTime(showtime: CachedShowtime) {
+  return showtime.localDateTime || showtime.startsAtUtc;
 }
 
 function AdminResults({

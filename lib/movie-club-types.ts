@@ -89,6 +89,22 @@ export interface Showtime {
   quals?: string[];
 }
 
+export interface CachedShowtime {
+  PK: string;
+  SK: string;
+  provider?: string;
+  providerShowtimeId?: string;
+  providerMovieId?: string;
+  providerTheaterId?: string;
+  theaterName: string;
+  theaterLocation?: string;
+  startsAtUtc: string;
+  localDateTime?: string;
+  screenFormat?: string;
+  ticketURI?: string;
+  quals?: string[];
+}
+
 export interface Vote {
   movieNightId: string;
   userId?: string;
