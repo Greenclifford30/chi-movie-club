@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Check, Clapperboard, Loader2, Plus, RefreshCcw, Search, ShieldCheck, Ticket, Vote } from "lucide-react";
+import { CalendarClock, Check, Clapperboard, Copy, Loader2, MailPlus, RefreshCcw, Search, ShieldCheck, Ticket, Vote } from "lucide-react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -11,16 +11,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import {
-  addShowtimes,
   confirmShowtime,
+  createClubInvites,
   createMovieNight,
   getActiveMovieNight,
+  getNowPlayingMovies,
   getVoteResults,
+  listClubInvites,
+  MovieClubApiError,
   refreshGracenote,
   searchMovies,
 } from "@/lib/movie-club-api";
 import { formatDate, formatTime, posterUrl, showtimeDateTime, showtimeLabel } from "@/lib/movie-club-format";
-import type { ActiveMovieNightResponse, MovieSnapshot, Showtime, VoteResults } from "@/lib/movie-club-types";
+import type { ActiveMovieNightResponse, ClubInvite, MovieSnapshot, Showtime, VoteResults } from "@/lib/movie-club-types";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -36,17 +39,15 @@ export default function ClubAdminPage() {
   const { token } = useAuth();
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [active, setActive] = useState<ActiveMovieNightResponse | null>(null);
+  const [invites, setInvites] = useState<ClubInvite[]>([]);
+  const [inviteEmails, setInviteEmails] = useState("");
   const [results, setResults] = useState<VoteResults | null>(null);
   const [movies, setMovies] = useState<MovieSnapshot[]>([]);
+  const [nowPlayingMovies, setNowPlayingMovies] = useState<MovieSnapshot[]>([]);
+  const [isNowPlayingLoading, setIsNowPlayingLoading] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState<MovieSnapshot | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetDate, setTargetDate] = useState(today);
-  const [manualShowtime, setManualShowtime] = useState({
-    theaterName: "",
-    theaterLocation: "",
-    startsAtUtc: "",
-    screenFormat: "Standard",
-  });
   const [refreshForm, setRefreshForm] = useState({ zip: "60422", radius: 30, numDays: 14, units: "mi" as const });
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -64,14 +65,50 @@ export default function ClubAdminPage() {
         const nextResults = await getVoteResults(token, nextActive.movieNight.movieNightId);
         setResults(nextResults);
       }
-    } catch {
+    } catch (activeError) {
       setActive(null);
       setResults(null);
+      if (activeError instanceof MovieClubApiError && activeError.status !== 404) {
+        setError(activeError.message);
+      }
+    }
+  }
+
+  async function loadInvites() {
+    if (!token) {
+      return;
+    }
+    try {
+      const result = await listClubInvites(token, clubId);
+      setInvites(result.invites);
+    } catch (inviteError) {
+      setInvites([]);
+      if (inviteError instanceof MovieClubApiError) {
+        setError(inviteError.message);
+      }
+    }
+  }
+
+  async function loadNowPlaying() {
+    if (!token) {
+      return;
+    }
+    setIsNowPlayingLoading(true);
+    try {
+      const result = await getNowPlayingMovies(token);
+      setNowPlayingMovies(result.results);
+    } catch (nowPlayingError) {
+      setNowPlayingMovies([]);
+      setError(nowPlayingError instanceof Error ? nowPlayingError.message : "Unable to load now playing movies.");
+    } finally {
+      setIsNowPlayingLoading(false);
     }
   }
 
   useEffect(() => {
     loadActive();
+    loadInvites();
+    loadNowPlaying();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clubId, token]);
 
@@ -115,26 +152,6 @@ export default function ClubAdminPage() {
     }
   }
 
-  async function handleAddShowtime(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token || !active?.movieNight) {
-      return;
-    }
-    setSaveState("saving");
-    setError(null);
-    setMessage(null);
-    try {
-      await addShowtimes(token, active.movieNight.movieNightId, { showtimes: [manualShowtime] });
-      setManualShowtime({ theaterName: "", theaterLocation: "", startsAtUtc: "", screenFormat: "Standard" });
-      setSaveState("saved");
-      setMessage("Showtime added and voting opened.");
-      await loadActive();
-    } catch (showtimeError) {
-      setSaveState("error");
-      setError(showtimeError instanceof Error ? showtimeError.message : "Unable to add showtime.");
-    }
-  }
-
   async function handleRefreshGracenote() {
     if (!token) {
       return;
@@ -170,9 +187,36 @@ export default function ClubAdminPage() {
     }
   }
 
+  async function handleCreateInvites(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    const emails = normalizeEmails(inviteEmails);
+    if (!emails.length) {
+      setError("Enter at least one email address.");
+      return;
+    }
+
+    setSaveState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await createClubInvites(token, clubId, emails);
+      setInvites(result.invites);
+      setInviteEmails("");
+      setSaveState("saved");
+      setMessage(`${emails.length} invite${emails.length === 1 ? "" : "s"} created.`);
+      await loadInvites();
+    } catch (inviteError) {
+      setSaveState("error");
+      setError(inviteError instanceof Error ? inviteError.message : "Unable to create invites.");
+    }
+  }
+
   const movieNight = active?.movieNight;
   const canCreate = Boolean(selectedMovie && targetDate && saveState !== "saving");
-  const canAddShowtime = Boolean(movieNight && manualShowtime.theaterName && manualShowtime.startsAtUtc && saveState !== "saving");
   const selectedPoster = selectedMovie ? posterUrl(selectedMovie) : "";
   const currentShowtimes = active?.showtimes || [];
 
@@ -187,7 +231,7 @@ export default function ClubAdminPage() {
             </div>
             <h1 className="text-4xl font-semibold tracking-tight text-white">Setup movie night</h1>
             <p className="mt-2 max-w-2xl text-slate-400">
-              Search movies through the backend, add candidate showtimes, monitor ranked-choice results, and confirm the final plan.
+              Browse movies, refresh candidate showtimes, monitor ranked-choice results, and confirm the final plan.
             </p>
           </div>
           <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
@@ -218,6 +262,22 @@ export default function ClubAdminPage() {
           <section className="space-y-6 lg:col-span-8">
             <Card className="border-white/10 bg-slate-900/80 py-6 shadow-2xl shadow-black/20">
               <CardHeader>
+                <h2 className="text-xl font-semibold text-white">Now playing</h2>
+              </CardHeader>
+              <CardContent>
+                {isNowPlayingLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-400">
+                    <Loader2 className="size-4 animate-spin" />
+                    Loading now playing movies...
+                  </div>
+                ) : (
+                  <MovieGrid movies={nowPlayingMovies} selectedMovie={selectedMovie} onSelect={setSelectedMovie} />
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/10 bg-slate-900/80 py-6 shadow-2xl shadow-black/20">
+              <CardHeader>
                 <h2 className="text-xl font-semibold text-white">Movie search</h2>
                 <p className="text-sm text-slate-400">Search runs through the backend `/movies/search` handler.</p>
               </CardHeader>
@@ -229,55 +289,9 @@ export default function ClubAdminPage() {
                     Search
                   </Button>
                 </form>
-                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {movies.map((movie) => {
-                    const image = posterUrl(movie);
-                    const activeMovie = selectedMovie?.externalId === movie.externalId;
-                    return (
-                      <button
-                        key={`${movie.provider}-${movie.externalId}`}
-                        type="button"
-                        onClick={() => setSelectedMovie(movie)}
-                        className={`overflow-hidden rounded-lg border bg-white/5 text-left transition ${activeMovie ? "border-cyan-300/50" : "border-white/10 hover:border-white/25"}`}
-                      >
-                        <div className="relative h-64 bg-slate-950">
-                          {image ? <Image src={image} alt={movie.title} fill sizes="240px" className="object-cover" /> : <div className="grid h-full place-items-center text-slate-500">No poster</div>}
-                        </div>
-                        <div className="p-3">
-                          <p className="font-semibold text-white">{movie.title}</p>
-                          <p className="mt-1 text-sm text-slate-400">{movie.releaseYear || movie.releaseDate || "Year TBD"}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
+                <div className="mt-5">
+                  <MovieGrid movies={movies} selectedMovie={selectedMovie} onSelect={setSelectedMovie} />
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-white/10 bg-slate-900/80 py-6 shadow-2xl shadow-black/20">
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-white">Manual showtime entry</h2>
-                <p className="text-sm text-slate-400">Adding showtimes transitions a planning movie night into voting.</p>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleAddShowtime} className="grid gap-4 md:grid-cols-2">
-                  <Field label="Theater">
-                    <Input value={manualShowtime.theaterName} onChange={(event) => setManualShowtime((current) => ({ ...current, theaterName: event.target.value }))} className="border-white/10 bg-white/5 text-white" />
-                  </Field>
-                  <Field label="Location">
-                    <Input value={manualShowtime.theaterLocation} onChange={(event) => setManualShowtime((current) => ({ ...current, theaterLocation: event.target.value }))} className="border-white/10 bg-white/5 text-white" />
-                  </Field>
-                  <Field label="Start time">
-                    <Input type="datetime-local" value={manualShowtime.startsAtUtc} onChange={(event) => setManualShowtime((current) => ({ ...current, startsAtUtc: event.target.value }))} className="border-white/10 bg-white/5 text-white" />
-                  </Field>
-                  <Field label="Format">
-                    <Input value={manualShowtime.screenFormat} onChange={(event) => setManualShowtime((current) => ({ ...current, screenFormat: event.target.value }))} className="border-white/10 bg-white/5 text-white" />
-                  </Field>
-                  <Button type="submit" disabled={!canAddShowtime} className="md:col-span-2 bg-violet-500 text-white hover:bg-violet-600">
-                    <Plus className="size-4" />
-                    Add showtime
-                  </Button>
-                </form>
               </CardContent>
             </Card>
           </section>
@@ -334,6 +348,30 @@ export default function ClubAdminPage() {
                 </Button>
               </CardContent>
             </Card>
+
+            <Card className="border-white/10 bg-slate-900/80 py-6">
+              <CardHeader>
+                <h2 className="font-semibold text-white">Club invites</h2>
+                <p className="text-sm text-slate-400">Send one or more email invites.</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form onSubmit={handleCreateInvites} className="space-y-3">
+                  <Field label="Email addresses">
+                    <textarea
+                      value={inviteEmails}
+                      onChange={(event) => setInviteEmails(event.target.value)}
+                      placeholder="name@example.com, friend@example.com"
+                      className="min-h-28 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    />
+                  </Field>
+                  <Button type="submit" disabled={saveState === "saving" || !inviteEmails.trim()} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+                    {saveState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <MailPlus className="size-4" />}
+                    Create invites
+                  </Button>
+                </form>
+                <InviteList invites={invites} />
+              </CardContent>
+            </Card>
           </aside>
         </div>
 
@@ -343,6 +381,45 @@ export default function ClubAdminPage() {
         </section>
       </div>
     </AppShell>
+  );
+}
+
+function MovieGrid({
+  movies,
+  selectedMovie,
+  onSelect,
+}: {
+  movies: MovieSnapshot[];
+  selectedMovie: MovieSnapshot | null;
+  onSelect: (movie: MovieSnapshot) => void;
+}) {
+  if (!movies.length) {
+    return <p className="text-sm text-slate-400">No movies to show yet.</p>;
+  }
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {movies.map((movie) => {
+        const image = posterUrl(movie);
+        const activeMovie = selectedMovie?.provider === movie.provider && selectedMovie?.externalId === movie.externalId;
+        return (
+          <button
+            key={`${movie.provider}-${movie.externalId}`}
+            type="button"
+            onClick={() => onSelect(movie)}
+            className={`overflow-hidden rounded-lg border bg-white/5 text-left transition ${activeMovie ? "border-cyan-300/50" : "border-white/10 hover:border-white/25"}`}
+          >
+            <div className="relative h-64 bg-slate-950">
+              {image ? <Image src={image} alt={movie.title} fill sizes="240px" className="object-cover" /> : <div className="grid h-full place-items-center text-slate-500">No poster</div>}
+            </div>
+            <div className="p-3">
+              <p className="font-semibold text-white">{movie.title}</p>
+              <p className="mt-1 text-sm text-slate-400">{movie.releaseYear || movie.releaseDate || "Year TBD"}</p>
+            </div>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -411,6 +488,42 @@ function AdminResults({
   );
 }
 
+function InviteList({ invites }: { invites: ClubInvite[] }) {
+  if (!invites.length) {
+    return <p className="text-sm text-slate-400">No pending invites yet.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {invites.map((invite) => (
+        <div key={invite.inviteId} className="rounded-lg border border-white/10 bg-white/5 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate font-medium text-white">{invite.email}</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {invite.status} / expires {formatDate(invite.expiresAt)}
+              </p>
+            </div>
+            {invite.inviteUrl ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                title="Copy invite link"
+                onClick={() => navigator.clipboard?.writeText(invite.inviteUrl || "")}
+                className="text-slate-200 hover:bg-white/10"
+              >
+                <Copy className="size-4" />
+              </Button>
+            ) : null}
+          </div>
+          {invite.inviteUrl ? <p className="mt-2 truncate text-xs text-cyan-200">{invite.inviteUrl}</p> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
@@ -426,4 +539,15 @@ function Alert({ children, tone }: { children: React.ReactNode; tone: "rose" | "
       ? "mb-4 border-rose-400/30 bg-rose-500/10 text-rose-100"
       : "mb-4 border-green-400/30 bg-green-500/10 text-green-100";
   return <div className={`rounded-lg border p-3 text-sm ${classes}`}>{children}</div>;
+}
+
+function normalizeEmails(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\s,;]+/)
+        .map((email) => email.trim().toLowerCase())
+        .filter((email) => email.includes("@"))
+    )
+  );
 }

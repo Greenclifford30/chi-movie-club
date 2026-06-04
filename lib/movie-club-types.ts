@@ -14,6 +14,36 @@ export interface Club {
   memberCount?: number;
 }
 
+export interface ClubsResponse {
+  clubs: Club[];
+  isPlatformAdmin: boolean;
+}
+
+export interface ClubInvite {
+  clubId: string;
+  clubName?: string;
+  inviteId: string;
+  email: string;
+  role: "friend";
+  status: "pending" | "accepted" | "expired";
+  expiresAt: string;
+  expiresAtEpoch?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  inviteUrl?: string;
+}
+
+export interface ClubMembership {
+  clubId: string;
+  userId: string;
+  email?: string;
+  name?: string;
+  role: ClubRole;
+  status?: "active" | "invited" | "removed";
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface MovieSnapshot {
   provider: string;
   externalId: string;

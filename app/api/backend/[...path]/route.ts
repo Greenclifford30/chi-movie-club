@@ -22,7 +22,8 @@ async function proxy(req: NextRequest, context: Context) {
   });
 
   const authHeader = req.headers.get("authorization");
-  if (!authHeader) {
+  const isPublicInviteLookup = req.method === "GET" && path.length === 2 && path[0] === "invites";
+  if (!authHeader && !isPublicInviteLookup) {
     return NextResponse.json({ error: "Authorization bearer token is required." }, { status: 401 });
   }
 
@@ -32,7 +33,7 @@ async function proxy(req: NextRequest, context: Context) {
     method: req.method,
     headers: {
       "Content-Type": req.headers.get("content-type") || "application/json",
-      Authorization: authHeader,
+      ...(authHeader ? { Authorization: authHeader } : {}),
       "x-api-key": apiKey,
     },
     body,

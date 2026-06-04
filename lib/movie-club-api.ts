@@ -3,6 +3,10 @@
 import type {
   ActiveMovieNightResponse,
   ApiErrorBody,
+  Club,
+  ClubInvite,
+  ClubMembership,
+  ClubsResponse,
   HistoryMovieNight,
   MovieSnapshot,
   Rsvp,
@@ -51,9 +55,75 @@ async function apiFetch<T>(
   return data as T;
 }
 
+async function publicApiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(`/api/backend${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers || {}),
+    },
+  });
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    const body = data as ApiErrorBody | null;
+    throw new MovieClubApiError(
+      body?.error || body?.message || "Movie Club API request failed.",
+      response.status
+    );
+  }
+
+  return data as T;
+}
+
+export function listClubs(token: string) {
+  return apiFetch<ClubsResponse>(token, "/clubs");
+}
+
+export function createClub(token: string, body: { name: string; clubId?: string }) {
+  return apiFetch<{ club: Club }>(token, "/clubs", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function listClubInvites(token: string, clubId: string) {
+  return apiFetch<{ invites: ClubInvite[] }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/invites`
+  );
+}
+
+export function createClubInvites(token: string, clubId: string, emails: string[]) {
+  return apiFetch<{ invites: ClubInvite[] }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/invites`,
+    { method: "POST", body: JSON.stringify({ emails }) }
+  );
+}
+
+export function getInvite(token: string) {
+  return publicApiFetch<{ invite: ClubInvite }>(`/invites/${encodeURIComponent(token)}`);
+}
+
+export function acceptInvite(authToken: string, inviteToken: string) {
+  return apiFetch<{ membership: ClubMembership; clubId: string }>(
+    authToken,
+    `/invites/${encodeURIComponent(inviteToken)}/accept`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+}
+
 export function searchMovies(token: string, query: string, page = 1) {
   const params = new URLSearchParams({ query, page: String(page) });
   return apiFetch<{ results: MovieSnapshot[] }>(token, `/movies/search?${params}`);
+}
+
+export function getNowPlayingMovies(token: string, page = 1) {
+  const params = new URLSearchParams({ page: String(page) });
+  return apiFetch<{ results: MovieSnapshot[] }>(token, `/movies/now-playing?${params}`);
 }
 
 export function createMovieNight(
