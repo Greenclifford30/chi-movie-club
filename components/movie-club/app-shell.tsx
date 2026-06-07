@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Film, Loader2, LogOut } from "lucide-react";
+import { Film, Loader2, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -37,13 +37,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { email, signOut } = useAuth();
-  const clubId = params.clubId || process.env.NEXT_PUBLIC_DEFAULT_CLUB_ID || "the-cinephiles";
+  const clubId = params.clubId || process.env.NEXT_PUBLIC_DEFAULT_CLUB_ID;
 
-  const links = [
-    { href: `/clubs/${clubId}`, label: "Active Night" },
-    { href: `/clubs/${clubId}/history`, label: "History" },
-    { href: `/clubs/${clubId}/admin`, label: "Admin" },
-  ];
+  const links = clubId
+    ? [
+        { href: `/clubs/${clubId}`, label: "Active Night" },
+        { href: `/clubs/${clubId}/history`, label: "History" },
+        { href: `/clubs/${clubId}/admin`, label: "Admin" },
+      ]
+    : [];
 
   return (
     <ProtectedPage>
@@ -71,10 +73,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </nav>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" className="hidden border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 md:inline-flex">
-                The Cinephiles
-                <ChevronDown className="size-4" />
-              </Button>
               <ThemeToggle />
               <Button
                 variant="ghost"
