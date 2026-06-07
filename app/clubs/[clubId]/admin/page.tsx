@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Check, Clapperboard, Copy, Loader2, MailPlus, RefreshCcw, Search, ShieldCheck, Ticket, Vote } from "lucide-react";
+import { CalendarClock, Check, Clapperboard, Clock, Copy, Loader2, MailPlus, MapPin, RefreshCcw, Search, ShieldCheck, Ticket, Vote } from "lucide-react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -30,6 +30,17 @@ import type { ActiveMovieNightResponse, CachedShowtime, ClubInvite, MovieSnapsho
 type SaveState = "idle" | "saving" | "saved" | "error";
 type LoadState = "idle" | "loading" | "error";
 type GracenoteSearchForm = { zip: string; radius: number; numDays: number; units: "mi" | "km" };
+type TheaterLikeShowtime = {
+  providerTheaterId?: string;
+  theaterName: string;
+  theaterLocation?: string;
+};
+type TheaterShowtimeGroup<T extends TheaterLikeShowtime> = {
+  key: string;
+  theaterName: string;
+  theaterLocation?: string;
+  showtimes: T[];
+};
 
 const setupSteps = [
   { label: "Movie", icon: Clapperboard },
@@ -333,42 +344,43 @@ export default function ClubAdminPage() {
         {error ? <Alert tone="rose">{error}</Alert> : null}
         {message ? <Alert tone="green">{message}</Alert> : null}
 
+        <Card className="mb-6 border-white/10 bg-slate-900/80 py-5 shadow-2xl shadow-black/20">
+          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-white">Now playing</h2>
+              <p className="text-sm text-slate-400">Pick a movie, then manage showtimes below.</p>
+            </div>
+            <span className="text-sm text-slate-500">{nowPlayingMovies.length} movies</span>
+          </CardHeader>
+          <CardContent>
+            {isNowPlayingLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <Loader2 className="size-4 animate-spin" />
+                Loading now playing movies...
+              </div>
+            ) : (
+              <MovieGrid movies={nowPlayingMovies} selectedMovie={selectedMovie} onSelect={setSelectedMovie} compact />
+            )}
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <section className="space-y-6 lg:col-span-8">
-            <Card className="border-white/10 bg-slate-900/80 py-6 shadow-2xl shadow-black/20">
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-white">Now playing</h2>
-              </CardHeader>
-              <CardContent>
-                {isNowPlayingLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-slate-400">
-                    <Loader2 className="size-4 animate-spin" />
-                    Loading now playing movies...
-                  </div>
-                ) : (
-                  <MovieGrid movies={nowPlayingMovies} selectedMovie={selectedMovie} onSelect={setSelectedMovie} />
-                )}
-              </CardContent>
-            </Card>
+            <GracenoteImportPanel
+              cachedShowtimes={cachedShowtimes}
+              form={refreshForm}
+              gracenoteState={gracenoteState}
+              importState={importState}
+              movieNightExists={Boolean(movieNight)}
+              onImport={handleImportShowtimes}
+              onRefresh={handleRefreshGracenote}
+              onSearch={handleSearchGracenote}
+              onToggle={toggleCachedShowtime}
+              selectedKeys={selectedCachedKeys}
+              setForm={setRefreshForm}
+            />
 
-            <Card className="border-white/10 bg-slate-900/80 py-6 shadow-2xl shadow-black/20">
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-white">Movie search</h2>
-                <p className="text-sm text-slate-400">Search runs through the backend `/movies/search` handler.</p>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSearch} className="flex flex-col gap-3 sm:flex-row">
-                  <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search a movie title" className="border-white/10 bg-white/5 text-white" />
-                  <Button type="submit" disabled={saveState === "saving"} className="bg-violet-500 text-white hover:bg-violet-600">
-                    {saveState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                    Search
-                  </Button>
-                </form>
-                <div className="mt-5">
-                  <MovieGrid movies={movies} selectedMovie={selectedMovie} onSelect={setSelectedMovie} />
-                </div>
-              </CardContent>
-            </Card>
+            <AdminShowtimes showtimes={currentShowtimes} />
           </section>
 
           <aside className="space-y-6 lg:col-span-4">
@@ -400,19 +412,24 @@ export default function ClubAdminPage() {
               </CardContent>
             </Card>
 
-            <GracenoteImportPanel
-              cachedShowtimes={cachedShowtimes}
-              form={refreshForm}
-              gracenoteState={gracenoteState}
-              importState={importState}
-              movieNightExists={Boolean(movieNight)}
-              onImport={handleImportShowtimes}
-              onRefresh={handleRefreshGracenote}
-              onSearch={handleSearchGracenote}
-              onToggle={toggleCachedShowtime}
-              selectedKeys={selectedCachedKeys}
-              setForm={setRefreshForm}
-            />
+            <Card className="border-white/10 bg-slate-900/80 py-6 shadow-2xl shadow-black/20">
+              <CardHeader>
+                <h2 className="font-semibold text-white">Movie search</h2>
+                <p className="text-sm text-slate-400">Use this if the movie is not in now playing.</p>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSearch} className="flex flex-col gap-3">
+                  <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search a movie title" className="border-white/10 bg-white/5 text-white" />
+                  <Button type="submit" disabled={saveState === "saving"} className="bg-violet-500 text-white hover:bg-violet-600">
+                    {saveState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                    Search
+                  </Button>
+                </form>
+                <div className="mt-5">
+                  <MovieGrid movies={movies} selectedMovie={selectedMovie} onSelect={setSelectedMovie} compact />
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="border-white/10 bg-slate-900/80 py-6">
               <CardHeader>
@@ -437,13 +454,10 @@ export default function ClubAdminPage() {
                 <InviteList invites={invites} />
               </CardContent>
             </Card>
+
+            <AdminResults results={results} onConfirm={handleConfirm} isSaving={saveState === "saving"} />
           </aside>
         </div>
-
-        <section className="mt-6 grid gap-6 lg:grid-cols-2">
-          <AdminShowtimes showtimes={currentShowtimes} />
-          <AdminResults results={results} onConfirm={handleConfirm} isSaving={saveState === "saving"} />
-        </section>
       </div>
     </AppShell>
   );
@@ -453,17 +467,19 @@ function MovieGrid({
   movies,
   selectedMovie,
   onSelect,
+  compact = false,
 }: {
   movies: MovieSnapshot[];
   selectedMovie: MovieSnapshot | null;
   onSelect: (movie: MovieSnapshot) => void;
+  compact?: boolean;
 }) {
   if (!movies.length) {
     return <p className="text-sm text-slate-400">No movies to show yet.</p>;
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div className={compact ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-4" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-3"}>
       {movies.map((movie) => {
         const image = posterUrl(movie);
         const activeMovie = selectedMovie?.provider === movie.provider && selectedMovie?.externalId === movie.externalId;
@@ -474,11 +490,11 @@ function MovieGrid({
             onClick={() => onSelect(movie)}
             className={`overflow-hidden rounded-lg border bg-white/5 text-left transition ${activeMovie ? "border-cyan-300/50" : "border-white/10 hover:border-white/25"}`}
           >
-            <div className="relative h-64 bg-slate-950">
-              {image ? <Image src={image} alt={movie.title} fill sizes="240px" className="object-cover" /> : <div className="grid h-full place-items-center text-slate-500">No poster</div>}
+            <div className={`relative bg-slate-950 ${compact ? "h-32" : "h-64"}`}>
+              {image ? <Image src={image} alt={movie.title} fill sizes={compact ? "180px" : "240px"} className="object-cover" /> : <div className="grid h-full place-items-center text-slate-500">No poster</div>}
             </div>
             <div className="p-3">
-              <p className="font-semibold text-white">{movie.title}</p>
+              <p className={`font-semibold text-white ${compact ? "line-clamp-2 text-sm" : ""}`}>{movie.title}</p>
               <p className="mt-1 text-sm text-slate-400">{movie.releaseYear || movie.releaseDate || "Year TBD"}</p>
             </div>
           </button>
@@ -514,27 +530,26 @@ function GracenoteImportPanel({
   setForm: (form: { zip: string; radius: number; numDays: number; units: "mi" | "km" }) => void;
 }) {
   const selectedCount = selectedKeys.length;
+  const groupedShowtimes = groupShowtimesByTheater(cachedShowtimes, cachedShowtimeDateTime);
 
   return (
     <Card className="border-white/10 bg-slate-900/80 py-6">
       <CardHeader>
-        <h2 className="font-semibold text-white">Gracenote import</h2>
+        <h2 className="text-xl font-semibold text-white">Gracenote import</h2>
         <p className="text-sm text-slate-400">Refresh the cache, search matching showtimes, then import candidates for voting.</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <form onSubmit={onSearch} className="space-y-3">
+        <form onSubmit={onSearch} className="grid gap-3 md:grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)_auto] md:items-end">
           <Field label="ZIP">
             <Input value={form.zip} onChange={(event) => setForm({ ...form, zip: event.target.value })} className="border-white/10 bg-white/5 text-white" />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Radius">
-              <Input type="number" min={1} value={form.radius} onChange={(event) => setForm({ ...form, radius: Number(event.target.value) })} className="border-white/10 bg-white/5 text-white" />
-            </Field>
-            <Field label="Days">
-              <Input type="number" min={1} value={form.numDays} onChange={(event) => setForm({ ...form, numDays: Number(event.target.value) })} className="border-white/10 bg-white/5 text-white" />
-            </Field>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <Field label="Radius">
+            <Input type="number" min={1} value={form.radius} onChange={(event) => setForm({ ...form, radius: Number(event.target.value) })} className="border-white/10 bg-white/5 text-white" />
+          </Field>
+          <Field label="Days">
+            <Input type="number" min={1} value={form.numDays} onChange={(event) => setForm({ ...form, numDays: Number(event.target.value) })} className="border-white/10 bg-white/5 text-white" />
+          </Field>
+          <div className="grid gap-2 sm:grid-cols-2 md:min-w-64">
             <Button type="button" onClick={onRefresh} disabled={!movieNightExists || importState === "saving"} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
               <RefreshCcw className="size-4" />
               Queue refresh
@@ -551,35 +566,43 @@ function GracenoteImportPanel({
         ) : cachedShowtimes.length ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-slate-400">{cachedShowtimes.length} cached showtimes</span>
+              <span className="text-slate-400">
+                {cachedShowtimes.length} cached showtimes across {groupedShowtimes.length} theater{groupedShowtimes.length === 1 ? "" : "s"}
+              </span>
               <span className="text-cyan-200">{selectedCount} selected</span>
             </div>
-            <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
-              {cachedShowtimes.map((showtime) => {
-                const key = cacheKey(showtime);
-                const dateTime = cachedShowtimeDateTime(showtime);
-                const isSelected = selectedKeys.includes(key);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => onToggle(showtime)}
-                    className={`w-full rounded-lg border p-3 text-left transition ${isSelected ? "border-cyan-300/60 bg-cyan-400/10" : "border-white/10 bg-white/5 hover:border-white/25"}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input type="checkbox" checked={isSelected} readOnly className="mt-1 size-4 accent-cyan-300" />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-white">{showtime.theaterName}</p>
-                        <p className="mt-1 text-sm text-slate-300">{formatDate(dateTime)} at {formatTime(dateTime)}</p>
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                          <span className="rounded bg-cyan-400/10 px-2 py-1 text-cyan-100">{showtime.screenFormat || "Standard"}</span>
-                          <span className="rounded bg-white/5 px-2 py-1 text-slate-300">{showtime.theaterLocation || "Chicago area"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="max-h-[34rem] space-y-4 overflow-y-auto pr-1">
+              {groupedShowtimes.map((group) => (
+                <TheaterShowtimeSection key={group.key} group={group}>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {group.showtimes.map((showtime) => {
+                      const key = cacheKey(showtime);
+                      const dateTime = cachedShowtimeDateTime(showtime);
+                      const isSelected = selectedKeys.includes(key);
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => onToggle(showtime)}
+                          className={`w-full rounded-lg border p-3 text-left transition ${isSelected ? "border-cyan-300/60 bg-cyan-400/10" : "border-white/10 bg-white/5 hover:border-white/25"}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <input type="checkbox" checked={isSelected} readOnly className="mt-1 size-4 accent-cyan-300" />
+                            <div className="min-w-0">
+                              <p className="font-semibold text-white">{formatDate(dateTime)}</p>
+                              <p className="mt-1 flex items-center gap-2 text-sm text-slate-300">
+                                <Clock className="size-4 text-amber-300" />
+                                {formatTime(dateTime)}
+                              </p>
+                              <span className="mt-2 inline-flex rounded bg-cyan-400/10 px-2 py-1 text-xs text-cyan-100">{showtime.screenFormat || "Standard"}</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </TheaterShowtimeSection>
+              ))}
             </div>
             <Button onClick={onImport} disabled={!selectedCount || importState === "saving"} className="w-full bg-green-500 text-slate-950 hover:bg-green-400">
               {importState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
@@ -595,29 +618,107 @@ function GracenoteImportPanel({
 }
 
 function AdminShowtimes({ showtimes }: { showtimes: Showtime[] }) {
+  const groupedShowtimes = groupShowtimesByTheater(showtimes, showtimeDateTime);
+
   return (
     <Card className="border-white/10 bg-slate-900/80 py-6">
       <CardHeader>
         <h2 className="text-xl font-semibold text-white">Candidate showtimes</h2>
+        <p className="text-sm text-slate-400">
+          {showtimes.length ? `${showtimes.length} imported slots across ${groupedShowtimes.length} theater${groupedShowtimes.length === 1 ? "" : "s"}.` : "Imported options for member voting appear here."}
+        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {showtimes.length ? (
-          showtimes.map((showtime) => {
-            const dateTime = showtimeDateTime(showtime);
-            return (
-              <div key={showtime.showtimeId} className="rounded-lg border border-white/10 bg-white/5 p-4">
-                <p className="font-semibold text-white">{showtime.theaterName}</p>
-                <p className="mt-1 text-sm text-slate-300">{formatDate(dateTime)} at {formatTime(dateTime)}</p>
-                <p className="mt-1 text-xs text-cyan-200">{showtime.screenFormat || "Standard"}</p>
+          groupedShowtimes.map((group) => (
+            <TheaterShowtimeSection key={group.key} group={group}>
+              <div className="grid gap-3 md:grid-cols-2">
+                {group.showtimes.map((showtime) => {
+                  const dateTime = showtimeDateTime(showtime);
+                  return (
+                    <div key={showtime.showtimeId} className="rounded-lg border border-white/10 bg-white/5 p-4">
+                      <p className="font-semibold text-white">{formatDate(dateTime)}</p>
+                      <p className="mt-1 flex items-center gap-2 text-sm text-slate-300">
+                        <Clock className="size-4 text-amber-300" />
+                        {formatTime(dateTime)}
+                      </p>
+                      <p className="mt-2 inline-flex rounded bg-cyan-400/10 px-2 py-1 text-xs text-cyan-100">{showtime.screenFormat || "Standard"}</p>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })
+            </TheaterShowtimeSection>
+          ))
         ) : (
           <p className="text-sm text-slate-400">No candidate showtimes are attached yet.</p>
         )}
       </CardContent>
     </Card>
   );
+}
+
+function TheaterShowtimeSection<T extends TheaterLikeShowtime>({
+  group,
+  children,
+}: {
+  group: TheaterShowtimeGroup<T>;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-white/10 bg-slate-950/30 p-4">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-white">{group.theaterName}</h3>
+          <p className="mt-1 flex items-center gap-2 text-sm text-slate-400">
+            <MapPin className="size-4 shrink-0" />
+            <span className="truncate">{group.theaterLocation || "Chicago area theater"}</span>
+          </p>
+        </div>
+        <span className="w-fit rounded bg-white/5 px-2 py-1 text-xs text-slate-300">
+          {group.showtimes.length} slot{group.showtimes.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function groupShowtimesByTheater<T extends TheaterLikeShowtime>(
+  showtimes: T[],
+  getDateTime: (showtime: T) => string
+): TheaterShowtimeGroup<T>[] {
+  const groups = new Map<string, TheaterShowtimeGroup<T>>();
+
+  for (const showtime of showtimes) {
+    const key = showtime.providerTheaterId || normalizeTheaterName(showtime.theaterName);
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.showtimes.push(showtime);
+    } else {
+      groups.set(key, {
+        key,
+        theaterName: showtime.theaterName,
+        theaterLocation: showtime.theaterLocation,
+        showtimes: [showtime],
+      });
+    }
+  }
+
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      showtimes: [...group.showtimes].sort((first, second) => compareDateTime(getDateTime(first), getDateTime(second))),
+    }))
+    .sort((first, second) => first.theaterName.localeCompare(second.theaterName));
+}
+
+function normalizeTheaterName(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ") || "unknown-theater";
+}
+
+function compareDateTime(first?: string, second?: string) {
+  return (Date.parse(first || "") || 0) - (Date.parse(second || "") || 0);
 }
 
 function cacheKey(showtime: CachedShowtime) {
