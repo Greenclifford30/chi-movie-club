@@ -21,13 +21,14 @@ function SignUpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = safeRedirect(searchParams.get("redirect"));
-  const { signIn, signUp, confirmSignUp } = useAuth();
+  const { signIn, signInWithGoogle, signUp, confirmSignUp } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
   async function handleSignUp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,6 +56,18 @@ function SignUpContent() {
       setError(confirmError instanceof Error ? confirmError.message : "Unable to confirm account.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setError(null);
+    setIsGoogleSubmitting(true);
+
+    try {
+      await signInWithGoogle(redirect);
+    } catch (googleError) {
+      setError(googleError instanceof Error ? googleError.message : "Unable to start Google sign-in.");
+      setIsGoogleSubmitting(false);
     }
   }
 
@@ -121,6 +134,21 @@ function SignUpContent() {
               />
             </div>
             {error ? <Alert>{error}</Alert> : null}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSubmitting || isGoogleSubmitting}
+              onClick={handleGoogleSignIn}
+              className="w-full border-white/10 bg-white text-slate-950 hover:bg-slate-100"
+            >
+              {isGoogleSubmitting ? <Loader2 className="size-4 animate-spin" /> : <GoogleMark />}
+              Continue with Google
+            </Button>
+            <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-slate-500">
+              <span className="h-px flex-1 bg-white/10" />
+              Email
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
             <Button type="submit" disabled={isSubmitting} className="w-full bg-violet-500 text-white hover:bg-violet-600">
               {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
               Sign up
@@ -176,6 +204,14 @@ function AuthShellFallback() {
 
 function Alert({ children }: { children: React.ReactNode }) {
   return <div className="rounded-lg border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">{children}</div>;
+}
+
+function GoogleMark() {
+  return (
+    <span className="grid size-4 place-items-center rounded-sm bg-white font-semibold leading-none text-[#4285f4]">
+      G
+    </span>
+  );
 }
 
 function safeRedirect(value: string | null) {

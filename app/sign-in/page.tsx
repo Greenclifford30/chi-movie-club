@@ -21,11 +21,12 @@ function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = safeRedirect(searchParams.get("redirect"));
-  const { isAuthenticated, isLoading, signIn } = useAuth();
+  const { isAuthenticated, isLoading, signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -45,6 +46,18 @@ function SignInContent() {
       setError(signInError instanceof Error ? signInError.message : "Unable to sign in.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setError(null);
+    setIsGoogleSubmitting(true);
+
+    try {
+      await signInWithGoogle(redirect);
+    } catch (googleError) {
+      setError(googleError instanceof Error ? googleError.message : "Unable to start Google sign-in.");
+      setIsGoogleSubmitting(false);
     }
   }
 
@@ -88,6 +101,23 @@ function SignInContent() {
               {error}
             </div>
           ) : null}
+
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isSubmitting || isGoogleSubmitting}
+            onClick={handleGoogleSignIn}
+            className="w-full border-white/10 bg-white text-slate-950 hover:bg-slate-100"
+          >
+            {isGoogleSubmitting ? <Loader2 className="size-4 animate-spin" /> : <GoogleMark />}
+            Continue with Google
+          </Button>
+
+          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-slate-500">
+            <span className="h-px flex-1 bg-white/10" />
+            Email
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
 
           <Button type="submit" disabled={isSubmitting} className="w-full bg-violet-500 text-white hover:bg-violet-600">
             {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
@@ -139,6 +169,14 @@ function AuthShellFallback() {
         Loading...
       </div>
     </main>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <span className="grid size-4 place-items-center rounded-sm bg-white font-semibold leading-none text-[#4285f4]">
+      G
+    </span>
   );
 }
 
