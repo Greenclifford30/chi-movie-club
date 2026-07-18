@@ -1,32 +1,34 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, Clock, Film, Loader2, MapPin, Ticket, Users, Vote } from "lucide-react";
+import { CalendarDays, CheckCircle2, Film, Loader2, Ticket, Users, Vote } from "lucide-react";
 import Image from "next/image";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { ActiveNightStateBanner } from "@/components/movie-club/active-night-state-banner";
+import { AddToCalendarButton } from "@/components/movie-club/add-to-calendar-button";
 import { AppShell } from "@/components/movie-club/app-shell";
+import { ConfirmedPlanCard } from "@/components/movie-club/confirmed-plan-card";
+import { EmptyState } from "@/components/movie-club/empty-state";
+import { RankedChoicePicker } from "@/components/movie-club/ranked-choice-picker";
+import { ShowtimeCard } from "@/components/movie-club/showtime-card";
+import { StatusAlert } from "@/components/movie-club/status-alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-context";
-import { formatDate, formatTime, posterUrl, showtimeDateTime, showtimeLabel } from "@/lib/movie-club-format";
+import { formatDate, posterUrl, showtimeDateTime } from "@/lib/movie-club-format";
 import { getActiveMovieNight, submitVote, updateRsvp } from "@/lib/movie-club-api";
 import type { ActiveMovieNightResponse, RsvpStatus, Showtime, TicketStatus } from "@/lib/movie-club-types";
 
-const rankLabels = [
-  { label: "First choice", points: "3 pts" },
-  { label: "Second choice", points: "2 pts" },
-  { label: "Third choice", points: "1 pt" },
-];
-
 export default function ActiveClubPage() {
   const { clubId } = useParams<{ clubId: string }>();
+  const router = useRouter();
   const { token } = useAuth();
   const [data, setData] = useState<ActiveMovieNightResponse | null>(null);
   const [rankings, setRankings] = useState<string[]>(["", "", ""]);
   const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus>("going");
   const [ticketStatus, setTicketStatus] = useState<TicketStatus>("not_purchased");
   const [isLoading, setIsLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,9 +39,15 @@ export default function ActiveClubPage() {
         return;
       }
       setIsLoading(true);
+      setIsRedirecting(false);
       setError(null);
       try {
         const active = await getActiveMovieNight(token, clubId);
+        if (active.movieNight.status === "completed") {
+          setIsRedirecting(true);
+          router.replace(`/clubs/${clubId}/history`);
+          return;
+        }
         setData(active);
         setRankings([
           active.currentUserVote?.rankings?.[0] || "",
@@ -58,7 +66,7 @@ export default function ActiveClubPage() {
     }
 
     load();
-  }, [clubId, token]);
+  }, [clubId, router, token]);
 
   const groupedShowtimes = useMemo(() => {
     return (data?.showtimes || []).reduce<Record<string, Showtime[]>>((acc, showtime) => {
@@ -68,17 +76,19 @@ export default function ActiveClubPage() {
     }, {});
   }, [data?.showtimes]);
 
-  const selectedCount = rankings.filter(Boolean).length;
   const movieNight = data?.movieNight;
   const movie = movieNight?.movie;
-  const selectedShowtimes = rankings
-    .map((ranking) => data?.showtimes.find((showtime) => showtime.showtimeId === ranking))
-    .filter(Boolean) as Showtime[];
   const confirmedShowtime =
     movieNight?.confirmedShowtime ||
     data?.showtimes.find((showtime) => showtime.showtimeId === movieNight?.confirmedShowtimeId);
-  const isConfirmed = movieNight?.status === "confirmed" || movieNight?.status === "completed";
-  const isVoting = movieNight?.status === "voting";
+  const isConfirmed = movieNight?.status === "confirmed";
+  const isVoting = Boolean(
+    movieNight?.status === "voting" &&
+    !movieNight.votingClosedAt &&
+    (!movieNight.votingClosesAt || Date.parse(movieNight.votingClosesAt) > Date.now())
+  );
+  const hasSavedVote = Boolean(data?.currentUserVote?.rankings?.length);
+  const hasShowtimes = Boolean(data?.showtimes.length);
   const imageUrl = movie ? posterUrl(movie) : "";
 
   function updateRanking(rankIndex: number, showtimeId: string) {
@@ -136,26 +146,41 @@ export default function ActiveClubPage() {
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {isLoading ? (
+        {isLoading || isRedirecting ? (
           <section className="grid min-h-[520px] place-items-center rounded-lg border border-white/10 bg-slate-900/70">
             <div className="flex flex-col items-center gap-3 text-slate-300">
               <Loader2 className="size-8 animate-spin text-cyan-300" />
-              <p>Loading the active movie night...</p>
+              <p>{isRedirecting ? "Opening club history..." : "Loading the active movie night..."}</p>
             </div>
           </section>
         ) : error && !data ? (
-          <EmptyState title="Movie night could not load" description={error} />
+          <EmptyState
+            title="Movie night could not load"
+            description={error}
+            action={{ label: "Back to clubs", href: "/clubs" }}
+          />
         ) : !data || !movieNight || !movie ? (
-          <EmptyState title="No active movie night" description="An admin can create the next movie night from the admin page." />
+          <EmptyState
+            title="No active movie night"
+            description="An admin can create the next movie night from the admin page. Members can check history while setup is pending."
+            action={{ label: "View club history", href: `/clubs/${clubId}/history` }}
+          />
         ) : (
           <>
-            <StatusBanner status={movieNight.status} />
-            {error ? <Alert tone="rose">{error}</Alert> : null}
-            {message ? <Alert tone="green">{message}</Alert> : null}
+            <ActiveNightStateBanner
+              status={movieNight.status}
+              showtimeCount={data.showtimes.length}
+              hasVote={hasSavedVote}
+              confirmed={Boolean(isConfirmed && confirmedShowtime)}
+              votingClosesAt={movieNight.votingClosesAt}
+              historyHref={`/clubs/${clubId}/history`}
+            />
+            {error ? <StatusAlert tone="danger" className="mb-4">{error}</StatusAlert> : null}
+            {message ? <StatusAlert tone="success" className="mb-4">{message}</StatusAlert> : null}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-              <section className="lg:col-span-8">
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 shadow-2xl shadow-black/30">
+              <section className="space-y-6 lg:col-span-8">
+                <div id="details" className="overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 shadow-2xl shadow-black/30">
                   <div className="grid grid-cols-1 md:grid-cols-[260px_1fr]">
                     <div className="relative min-h-[390px] bg-slate-950">
                       {imageUrl ? (
@@ -182,70 +207,59 @@ export default function ActiveClubPage() {
                   </div>
                 </div>
 
-                {isConfirmed && confirmedShowtime ? (
-                  <section className="mt-6 rounded-lg border border-green-400/25 bg-green-500/10 p-5">
-                    <p className="mb-2 flex items-center gap-2 font-semibold text-green-100">
-                      <CheckCircle2 className="size-5" />
-                      Movie night confirmed
-                    </p>
-                    <h2 className="text-2xl font-semibold text-white">{confirmedShowtime.theaterName}</h2>
-                    <p className="mt-2 text-slate-300">
-                      {formatDate(showtimeDateTime(confirmedShowtime), "EEEE, MMMM d")} at {formatTime(showtimeDateTime(confirmedShowtime))} / {confirmedShowtime.screenFormat || "Standard"}
-                    </p>
-                  </section>
-                ) : null}
+                {isConfirmed && confirmedShowtime ? <ConfirmedPlanCard showtime={confirmedShowtime} secondaryAction={token ? <AddToCalendarButton movieNightId={movieNight.movieNightId} status={movieNight.status} token={token} /> : null} /> : null}
 
-                <section className="mt-6 space-y-4">
+                <section id="showtimes" className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="text-2xl font-semibold text-white">Candidate showtimes</h2>
                     <span className="text-sm text-slate-400">{Object.keys(groupedShowtimes).length} theaters</span>
                   </div>
-                  {Object.entries(groupedShowtimes).map(([theater, slots]) => (
-                    <Card key={theater} className="border-white/10 bg-slate-900/70 py-5">
-                      <CardHeader>
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <h3 className="font-semibold text-white">{theater}</h3>
-                            <p className="mt-1 flex items-center gap-2 text-sm text-slate-400">
-                              <MapPin className="size-4" />
-                              {slots[0]?.theaterLocation || "Chicago area theater"}
-                            </p>
+                  {hasShowtimes ? (
+                    Object.entries(groupedShowtimes).map(([theater, slots]) => (
+                      <Card key={theater} className="border-white/10 bg-slate-900/70 py-5">
+                        <CardHeader>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <h3 className="font-semibold text-white">{theater}</h3>
+                              <p className="mt-1 text-sm text-slate-400">{slots[0]?.theaterLocation || "Chicago area theater"}</p>
+                            </div>
+                            <span className="rounded bg-white/5 px-2 py-1 text-xs text-slate-300">{slots.length} slots</span>
                           </div>
-                          <span className="rounded bg-white/5 px-2 py-1 text-xs text-slate-300">{slots.length} slots</span>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          {slots.map((slot) => {
-                            const dateTime = showtimeDateTime(slot);
-                            return (
-                              <div key={slot.showtimeId} className="rounded-lg border border-white/10 bg-white/5 p-4">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <p className="font-semibold text-white">{formatDate(dateTime)}</p>
-                                    <p className="mt-1 flex items-center gap-2 text-sm text-slate-300">
-                                      <Clock className="size-4 text-amber-300" />
-                                      {formatTime(dateTime)}
-                                    </p>
-                                  </div>
-                                  <span className="rounded bg-cyan-400/10 px-2 py-1 text-xs font-medium text-cyan-100">{slot.screenFormat || "Standard"}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            {slots.map((slot) => (
+                              <ShowtimeCard
+                                key={slot.showtimeId}
+                                theaterName={slot.theaterName}
+                                theaterLocation={slot.theaterLocation}
+                                dateTime={showtimeDateTime(slot)}
+                                screenFormat={slot.screenFormat}
+                                ticketURI={slot.ticketURI}
+                                selected={confirmedShowtime?.showtimeId === slot.showtimeId || rankings.includes(slot.showtimeId)}
+                                compact
+                              />
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <EmptyState
+                      title="No showtimes yet"
+                      description="The admin still needs to import candidate showtimes. Once options are available, this page will switch to ranked voting."
+                      action={{ label: "Check history", href: `/clubs/${clubId}/history` }}
+                    />
+                  )}
                 </section>
               </section>
 
               <aside className="space-y-6 lg:col-span-4">
                 {isConfirmed ? (
-                  <Card className="sticky top-24 border-green-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-black/20">
+                  <Card id="rsvp" className="sticky top-24 border-green-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-black/20">
                     <CardHeader>
                       <h2 className="font-semibold text-white">RSVP and tickets</h2>
-                      <p className="text-sm text-slate-400">Update your attendance and ticket status.</p>
+                      <p className="text-sm text-slate-400">One update records both your attendance and ticket status.</p>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <Segmented label="RSVP" value={rsvpStatus} onChange={(value) => setRsvpStatus(value as RsvpStatus)} options={[["going", "Going"], ["maybe", "Maybe"], ["not_going", "Not going"]]} />
@@ -254,60 +268,48 @@ export default function ActiveClubPage() {
                         {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                         Update RSVP
                       </Button>
+                      {token ? (
+                        <AddToCalendarButton
+                          movieNightId={movieNight.movieNightId}
+                          status={movieNight.status}
+                          token={token}
+                        />
+                      ) : null}
                     </CardContent>
                   </Card>
                 ) : (
-                  <Card className="sticky top-24 border-violet-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-violet-950/20">
+                  <Card id="vote" className="sticky top-24 border-violet-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-violet-950/20">
                     <CardHeader>
                       <div className="flex items-center gap-3">
                         <div className="rounded-full bg-violet-400/20 p-2 text-violet-200">
                           <Vote className="size-5" />
                         </div>
                         <div>
-                          <h2 className="font-semibold text-white">Rank your top showtimes</h2>
-                          <p className="text-sm text-slate-400">{isVoting ? "Pick up to 3. No duplicates." : "Voting opens after showtimes are added."}</p>
+                          <h2 className="font-semibold text-white">{hasSavedVote ? "Edit your vote" : "Rank your top showtimes"}</h2>
+                          <p className="text-sm text-slate-400">
+                            {isVoting && hasShowtimes ? "Pick up to 3. No duplicates." : movieNight?.status === "voting" ? "Voting is closed while the admin confirms the final plan." : "Voting opens after showtimes are added."}
+                          </p>
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      {rankLabels.map((rank, index) => {
-                        const unavailable = rankings.filter((value, valueIndex) => value && valueIndex !== index);
-                        return (
-                          <div key={rank.label} className="space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <label className="text-sm font-medium text-slate-200">{rank.label}</label>
-                              <span className="text-xs text-slate-500">{rank.points}</span>
-                            </div>
-                            <Select value={rankings[index] || "none"} onValueChange={(value) => updateRanking(index, value)} disabled={!isVoting}>
-                              <SelectTrigger className="w-full border-white/10 bg-white/5 text-slate-100">
-                                <SelectValue placeholder="Choose a showtime" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No selection</SelectItem>
-                                {data.showtimes.map((showtime) => (
-                                  <SelectItem key={showtime.showtimeId} value={showtime.showtimeId} disabled={unavailable.includes(showtime.showtimeId)}>
-                                    {showtimeLabel(showtime)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        );
-                      })}
-                      {selectedShowtimes.length ? (
-                        <ol className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                          {selectedShowtimes.map((showtime, index) => (
-                            <li key={showtime.showtimeId} className="flex gap-2 py-1">
-                              <span className="text-cyan-300">{index + 1}.</span>
-                              <span>{showtimeLabel(showtime)}</span>
-                            </li>
-                          ))}
-                        </ol>
-                      ) : null}
-                      <Button className="w-full bg-violet-500 text-white hover:bg-violet-600" disabled={!isVoting || !selectedCount || isSaving} onClick={saveVote}>
-                        {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}
-                        Save ranked vote
-                      </Button>
+                    <CardContent>
+                      {hasShowtimes ? (
+                        <RankedChoicePicker
+                          showtimes={data.showtimes}
+                          rankings={rankings}
+                          disabled={!isVoting}
+                          isSaving={isSaving}
+                          hasSavedVote={hasSavedVote}
+                          onChange={updateRanking}
+                          onSave={saveVote}
+                        />
+                      ) : (
+                        <EmptyState
+                          title="Ballot not ready"
+                          description="There are no candidate showtimes to rank yet. The next action belongs to the club admin."
+                          className="bg-white/5"
+                        />
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -318,39 +320,6 @@ export default function ActiveClubPage() {
       </div>
     </AppShell>
   );
-}
-
-function StatusBanner({ status }: { status: string }) {
-  const copy: Record<string, string> = {
-    planning: "Admin is setting up this movie night.",
-    voting: "Voting is open. Rank your top 3 showtimes.",
-    confirmed: "Movie night confirmed. RSVP and mark your ticket status.",
-    completed: "This movie night is complete.",
-    cancelled: "This movie night was cancelled.",
-  };
-
-  return (
-    <section className="mb-6 rounded-lg border border-violet-400/30 bg-violet-500/10 p-4 shadow-2xl shadow-violet-950/20">
-      <p className="font-semibold text-violet-100">{copy[status] || "Movie night status is updating."}</p>
-    </section>
-  );
-}
-
-function EmptyState({ title, description }: { title: string; description: string }) {
-  return (
-    <section className="rounded-lg border border-white/10 bg-slate-900/70 p-6">
-      <p className="font-semibold text-white">{title}</p>
-      <p className="mt-2 text-sm text-slate-300">{description}</p>
-    </section>
-  );
-}
-
-function Alert({ children, tone }: { children: React.ReactNode; tone: "rose" | "green" }) {
-  const classes =
-    tone === "rose"
-      ? "mb-4 border-rose-400/30 bg-rose-500/10 text-rose-100"
-      : "mb-4 border-green-400/30 bg-green-500/10 text-green-100";
-  return <div className={`rounded-lg border p-3 text-sm ${classes}`}>{children}</div>;
 }
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Film, Loader2, LogOut } from "lucide-react";
+import { Film, Loader2, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -74,6 +74,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />
+              <Button asChild variant="ghost" size="icon" title="Account settings">
+                <Link href="/settings">
+                  <Settings className="size-4" />
+                  <span className="sr-only">Account settings</span>
+                </Link>
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"

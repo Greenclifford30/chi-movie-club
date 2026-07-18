@@ -61,6 +61,7 @@ const ToggleGroupItem = React.forwardRef<HTMLButtonElement, ToggleGroupItemProps
       <button
         ref={ref}
         type="button"
+        aria-pressed={isSelected}
         onClick={handleClick}
         disabled={disabled}
         className={cn(

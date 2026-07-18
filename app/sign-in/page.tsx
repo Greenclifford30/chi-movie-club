@@ -1,6 +1,6 @@
 "use client";
 
-import { Film, Loader2, LogIn } from "lucide-react";
+import { Chrome, Film, Loader2, LogIn } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useState } from "react";
@@ -21,11 +21,12 @@ function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = safeRedirect(searchParams.get("redirect"));
-  const { isAuthenticated, isLoading, signIn } = useAuth();
+  const { isAuthenticated, isLoading, signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -48,6 +49,18 @@ function SignInContent() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    setError(null);
+    setIsGoogleSubmitting(true);
+
+    try {
+      await signInWithGoogle(redirect);
+    } catch (signInError) {
+      setError(signInError instanceof Error ? signInError.message : "Unable to start Google sign-in.");
+      setIsGoogleSubmitting(false);
+    }
+  }
+
   return (
     <AuthShell>
       <form onSubmit={handleSubmit} className="flex flex-col justify-center p-8">
@@ -57,6 +70,23 @@ function SignInContent() {
         </div>
 
         <div className="space-y-4">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isSubmitting || isGoogleSubmitting}
+            onClick={handleGoogleSignIn}
+            className="w-full border-white/10 bg-white text-slate-950 hover:bg-slate-100 hover:text-slate-950"
+          >
+            {isGoogleSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Chrome className="size-4" />}
+            Continue with Google
+          </Button>
+
+          <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-slate-500">
+            <span className="h-px flex-1 bg-white/10" />
+            <span>Email</span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -89,7 +119,7 @@ function SignInContent() {
             </div>
           ) : null}
 
-          <Button type="submit" disabled={isSubmitting} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+          <Button type="submit" disabled={isSubmitting || isGoogleSubmitting} className="w-full bg-violet-500 text-white hover:bg-violet-600">
             {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
             Sign in
           </Button>

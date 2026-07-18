@@ -19,9 +19,20 @@ import {
   Vote,
 } from "lucide-react";
 import Image from "next/image";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AdminStepCard } from "@/components/movie-club/admin-step-card";
 import { AppShell } from "@/components/movie-club/app-shell";
+import { ConfirmedPlanCard } from "@/components/movie-club/confirmed-plan-card";
+import { EmptyState } from "@/components/movie-club/empty-state";
+import { ShowtimeCard } from "@/components/movie-club/showtime-card";
+import { StatusAlert } from "@/components/movie-club/status-alert";
+import {
+  DEFAULT_PLANNING_RADIUS,
+  DEFAULT_PLANNING_ZIP,
+  PlanningPreferencesFields,
+  validatePlanningLocation,
+} from "@/components/movie-club/planning-preferences-fields";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,20 +40,31 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import {
   addShowtimes,
+  approveBulkShowtimeCandidates,
+  approveShowtimeCandidate,
+  completeMovieNight,
+  closeVoting,
   confirmShowtime,
   createClubInvites,
   createMovieNight,
+  discoverMovies,
   getActiveMovieNight,
-  getNowPlayingMovies,
+  getAttendance,
+  getUserPlanningPreferences,
   getVoteResults,
+  importShowtimesForMovieNight,
   listClubInvites,
   MovieClubApiError,
+  openVoting,
   refreshGracenote,
+  rejectShowtimeCandidate,
   searchGracenoteShowtimes,
   searchMovies,
+  updateMovieNightPlanning,
+  updateMovieNightSetup,
 } from "@/lib/movie-club-api";
 import { formatDate, formatTime, posterUrl, showtimeDateTime, showtimeLabel } from "@/lib/movie-club-format";
-import type { ActiveMovieNightResponse, CachedShowtime, ClubInvite, MovieNightStatus, MovieSnapshot, Showtime, VoteResults } from "@/lib/movie-club-types";
+import type { ActiveMovieNightResponse, AttendanceResponse, CachedShowtime, ClubInvite, MovieDiscoveryResult, MovieNightPlanningInput, MovieNightStatus, MovieSnapshot, Showtime, VoteResults } from "@/lib/movie-club-types";
 
 type ActionState = "idle" | "saving" | "saved" | "error";
 type LoadState = "idle" | "loading" | "error";
@@ -63,8 +85,10 @@ type TheaterShowtimeGroup<T extends TheaterLikeShowtime> = {
 
 const progressSteps = [
   { label: "Movie", icon: Clapperboard },
+  { label: "Planning", icon: CalendarClock },
   { label: "Showtimes", icon: Ticket },
   { label: "Voting", icon: Vote },
+  { label: "Results", icon: ClipboardCheck },
   { label: "Confirm", icon: ShieldCheck },
 ];
 
@@ -78,19 +102,38 @@ const showtimeTimeBuckets: { value: ShowtimeTimeBucket; label: string }[] = [
 
 export default function ClubAdminPage() {
   const { clubId } = useParams<{ clubId: string }>();
+  const router = useRouter();
   const { token } = useAuth();
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [active, setActive] = useState<ActiveMovieNightResponse | null>(null);
+  const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(true);
+  const [attendance, setAttendance] = useState<AttendanceResponse | null>(null);
   const [invites, setInvites] = useState<ClubInvite[]>([]);
   const [inviteEmails, setInviteEmails] = useState("");
   const [results, setResults] = useState<VoteResults | null>(null);
   const [movies, setMovies] = useState<MovieSnapshot[]>([]);
   const [nowPlayingMovies, setNowPlayingMovies] = useState<MovieSnapshot[]>([]);
+  const [movieDiscoveryMode, setMovieDiscoveryMode] = useState<"now-playing" | "coming-soon">("now-playing");
   const [isNowPlayingLoading, setIsNowPlayingLoading] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState<MovieSnapshot | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetDate, setTargetDate] = useState(today);
-  const [refreshForm, setRefreshForm] = useState<GracenoteSearchForm>({ zip: "60422", radius: 30, numDays: 14, units: "mi" });
+  const [planningForm, setPlanningForm] = useState<MovieNightPlanningInput>({
+    targetDate: today,
+    dateWindowStart: today,
+    dateWindowEnd: today,
+    zipCode: DEFAULT_PLANNING_ZIP,
+    radiusMiles: DEFAULT_PLANNING_RADIUS,
+    timezone: "America/Chicago",
+    preferredFormats: [],
+    preferredTheaterIds: [],
+  });
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
+  const [candidateDateFilter, setCandidateDateFilter] = useState("all");
+  const [candidateTheaterFilter, setCandidateTheaterFilter] = useState("all");
+  const [candidateFormatFilter, setCandidateFormatFilter] = useState("all");
+  const [refreshForm, setRefreshForm] = useState<GracenoteSearchForm>({ zip: DEFAULT_PLANNING_ZIP, radius: DEFAULT_PLANNING_RADIUS, numDays: 14, units: "mi" });
+  const [usesAccountDefaults, setUsesAccountDefaults] = useState(false);
   const [cachedShowtimes, setCachedShowtimes] = useState<CachedShowtime[]>([]);
   const [selectedCachedKeys, setSelectedCachedKeys] = useState<string[]>([]);
   const [selectedShowtimeDate, setSelectedShowtimeDate] = useState("all");
@@ -100,8 +143,13 @@ export default function ClubAdminPage() {
   const [movieSearchState, setMovieSearchState] = useState<ActionState>("idle");
   const [refreshState, setRefreshState] = useState<ActionState>("idle");
   const [importState, setImportState] = useState<ActionState>("idle");
+  const [planningState, setPlanningState] = useState<ActionState>("idle");
+  const [candidateState, setCandidateState] = useState<ActionState>("idle");
+  const [votingState, setVotingState] = useState<ActionState>("idle");
+  const [votingClosesAt, setVotingClosesAt] = useState("");
   const [inviteState, setInviteState] = useState<ActionState>("idle");
   const [confirmState, setConfirmState] = useState<ActionState>("idle");
+  const [completeState, setCompleteState] = useState<ActionState>("idle");
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +161,24 @@ export default function ClubAdminPage() {
     try {
       const nextActive = await getActiveMovieNight(token, clubId);
       setActive(nextActive);
+      if (nextActive.currentUserRole && nextActive.currentUserRole !== "admin") {
+        router.replace(`/clubs/${encodeURIComponent(clubId)}`);
+        return;
+      }
       setSelectedMovie(nextActive.movieNight.movie);
+      setTargetDate(nextActive.movieNight.targetDate || today);
+      setPlanningForm({
+        targetDate: nextActive.movieNight.targetDate || today,
+        dateWindowStart: nextActive.movieNight.dateWindowStart || nextActive.movieNight.targetDate || today,
+        dateWindowEnd: nextActive.movieNight.dateWindowEnd || nextActive.movieNight.targetDate || today,
+        zipCode: nextActive.movieNight.zipCode || DEFAULT_PLANNING_ZIP,
+        radiusMiles: nextActive.movieNight.radiusMiles || DEFAULT_PLANNING_RADIUS,
+        timezone: nextActive.movieNight.timezone || "America/Chicago",
+        preferredFormats: nextActive.movieNight.preferredFormats || [],
+        preferredTheaterIds: nextActive.movieNight.preferredTheaterIds || [],
+      });
+      setUsesAccountDefaults(false);
+      setVotingClosesAt(nextActive.movieNight.votingClosesAt ? toLocalDateTimeInput(nextActive.movieNight.votingClosesAt) : defaultVotingDeadline(nextActive.movieNight.targetDate || today));
       if (
         nextActive.showtimes.length &&
         (nextActive.movieNight.status === "voting" || nextActive.movieNight.status === "confirmed")
@@ -126,7 +191,23 @@ export default function ClubAdminPage() {
     } catch (activeError) {
       setActive(null);
       setResults(null);
-      if (activeError instanceof MovieClubApiError && activeError.status !== 404) {
+      if (activeError instanceof MovieClubApiError && activeError.status === 404 && token) {
+        try {
+          const { preferences } = await getUserPlanningPreferences(token);
+          setPlanningForm((current) => ({
+            ...current,
+            zipCode: preferences.defaultZipCode || DEFAULT_PLANNING_ZIP,
+            radiusMiles: preferences.defaultRadiusMiles || DEFAULT_PLANNING_RADIUS,
+            preferredFormats: preferences.preferredFormats || [],
+          }));
+          setUsesAccountDefaults(true);
+        } catch (preferenceError) {
+          setUsesAccountDefaults(true);
+          if (!(preferenceError instanceof MovieClubApiError) || preferenceError.status !== 404) {
+            setError(preferenceError instanceof Error ? preferenceError.message : "Unable to load planning defaults.");
+          }
+        }
+      } else if (activeError instanceof MovieClubApiError) {
         setError(activeError.message);
       }
     }
@@ -147,28 +228,62 @@ export default function ClubAdminPage() {
     }
   }
 
+  async function loadAttendance(movieNightId: string) {
+    if (!token) return;
+    try {
+      setAttendance(await getAttendance(token, movieNightId));
+    } catch (attendanceError) {
+      setAttendance(null);
+      if (!(attendanceError instanceof MovieClubApiError) || attendanceError.status !== 409) {
+        setError(attendanceError instanceof Error ? attendanceError.message : "Unable to load attendance.");
+      }
+    }
+  }
+
   async function loadNowPlaying() {
     if (!token) {
       return;
     }
     setIsNowPlayingLoading(true);
     try {
-      const result = await getNowPlayingMovies(token);
-      setNowPlayingMovies(result.results);
+      const result = await discoverMovies(token, movieDiscoveryMode);
+      setNowPlayingMovies(result.results.map(discoveryToMovieSnapshot));
     } catch (nowPlayingError) {
       setNowPlayingMovies([]);
-      setError(nowPlayingError instanceof Error ? nowPlayingError.message : "Unable to load now playing movies.");
+      setError(nowPlayingError instanceof Error ? nowPlayingError.message : "Unable to load movie discovery.");
     } finally {
       setIsNowPlayingLoading(false);
     }
   }
 
   useEffect(() => {
-    loadActive();
-    loadInvites();
-    loadNowPlaying();
+    let cancelled = false;
+    setIsWorkspaceLoading(true);
+    Promise.all([loadActive(), loadInvites()]).finally(() => {
+      if (!cancelled) setIsWorkspaceLoading(false);
+    });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clubId, token]);
+
+  useEffect(() => {
+    loadNowPlaying();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clubId, token, movieDiscoveryMode]);
+
+  useEffect(() => {
+    const movieNight = active?.movieNight;
+    if (!movieNight || !["queued", "running"].includes(movieNight.showtimeImportStatus || "")) return;
+    const timer = window.setInterval(() => { void loadActive(); }, 3000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.movieNight.movieNightId, active?.movieNight.showtimeImportStatus, token]);
+
+  useEffect(() => {
+    if (active?.movieNight.status === "confirmed") void loadAttendance(active.movieNight.movieNightId);
+    else setAttendance(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.movieNight.movieNightId, active?.movieNight.status, token]);
 
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -193,15 +308,38 @@ export default function ClubAdminPage() {
     if (!token || !selectedMovie || !targetDate) {
       return;
     }
+    if (movieNight && movieNight.status !== "planning" && movieNight.status !== "completed") {
+      setError("Movie night setup can only be replaced while it is still in planning.");
+      return;
+    }
+    const validationError = validatePlanningLocation(planningForm.zipCode, planningForm.radiusMiles);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setCreateState("saving");
     setError(null);
     setMessage(null);
     try {
-      await createMovieNight(token, clubId, {
-        targetDate,
-        movieSelectionMode: "admin_selected",
-        movie: selectedMovie,
-      });
+      if (movieNight?.status === "planning") {
+        await updateMovieNightSetup(token, movieNight.movieNightId, {
+          ...planningForm,
+          targetDate: planningForm.targetDate || targetDate,
+          movie: selectedMovie,
+        });
+        setCachedShowtimes([]);
+        setSelectedCachedKeys([]);
+        setSelectedCandidateIds([]);
+        setSelectedShowtimeDate("all");
+        setShowtimeTimeBucket("all");
+      } else {
+        await createMovieNight(token, clubId, {
+          ...planningForm,
+          targetDate: planningForm.targetDate || targetDate,
+          movieSelectionMode: "admin_selected",
+          movie: selectedMovie,
+        });
+      }
       setCreateState("saved");
       setMessage(`${selectedMovie.title} is ready for showtime import.`);
       await loadActive();
@@ -219,9 +357,17 @@ export default function ClubAdminPage() {
     setError(null);
     setMessage(null);
     try {
-      await refreshGracenote(token, refreshForm);
+      const numDays = inclusiveDateCount(planningForm.dateWindowStart, planningForm.dateWindowEnd);
+      const searchForm = {
+        ...refreshForm,
+        zip: planningForm.zipCode,
+        radius: planningForm.radiusMiles,
+        numDays,
+        startDate: planningForm.dateWindowStart,
+      };
+      await refreshGracenote(token, searchForm);
       setRefreshState("saved");
-      setMessage(`Gracenote refresh queued for ${refreshForm.zip}, ${refreshForm.radius}${refreshForm.units}, ${refreshForm.numDays} days.`);
+      setMessage(`Gracenote refresh queued for ${searchForm.zip}, ${searchForm.radius}${searchForm.units}, ${searchForm.numDays} days.`);
     } catch (refreshError) {
       setRefreshState("error");
       setError(refreshError instanceof Error ? refreshError.message : "Unable to queue Gracenote refresh.");
@@ -247,10 +393,11 @@ export default function ClubAdminPage() {
         title: movieNight.movie.title,
         provider: movieNight.movie.provider,
         providerMovieId: movieNight.movie.externalId,
-        zip: refreshForm.zip,
-        radius: refreshForm.radius,
-        numDays: refreshForm.numDays,
+        zip: planningForm.zipCode,
+        radius: planningForm.radiusMiles,
+        numDays: inclusiveDateCount(planningForm.dateWindowStart, planningForm.dateWindowEnd),
         units: refreshForm.units,
+        startDate: planningForm.dateWindowStart,
       });
       setCachedShowtimes(result.showtimes);
       setGracenoteState("idle");
@@ -289,6 +436,133 @@ export default function ClubAdminPage() {
     }
   }
 
+  async function handleSavePlanning() {
+    if (!token || !movieNight) {
+      return;
+    }
+    if (movieNight.status !== "planning") {
+      setError("Planning criteria are locked after voting opens.");
+      return;
+    }
+    const validationError = validatePlanningLocation(planningForm.zipCode, planningForm.radiusMiles);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setPlanningState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      await updateMovieNightPlanning(token, movieNight.movieNightId, planningForm);
+      setPlanningState("saved");
+      setTargetDate(planningForm.targetDate);
+      setMessage("Planning criteria saved.");
+      await loadActive();
+    } catch (planningError) {
+      setPlanningState("error");
+      setError(planningError instanceof Error ? planningError.message : "Unable to save planning criteria.");
+    }
+  }
+
+  async function handleBackendImportShowtimes() {
+    if (!token || !movieNight) {
+      return;
+    }
+    setImportState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await importShowtimesForMovieNight(token, movieNight.movieNightId);
+      setImportState("saved");
+      setMessage(`Showtime import queued for ${result.importJob.requestedDates.length} day${result.importJob.requestedDates.length === 1 ? "" : "s"}. This page will update automatically.`);
+      setSelectedCandidateIds([]);
+      await loadActive();
+    } catch (importError) {
+      setImportState("error");
+      setError(importError instanceof Error ? importError.message : "Unable to import showtimes.");
+    }
+  }
+
+  async function handleCandidateStatus(showtimeId: string, status: "approved" | "rejected") {
+    if (!token || !movieNight) {
+      return;
+    }
+    setCandidateState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      if (status === "approved") {
+        await approveShowtimeCandidate(token, movieNight.movieNightId, showtimeId);
+      } else {
+        await rejectShowtimeCandidate(token, movieNight.movieNightId, showtimeId);
+      }
+      setCandidateState("saved");
+      setMessage(status === "approved" ? "Showtime approved for voting." : "Showtime rejected.");
+      await loadActive();
+    } catch (candidateError) {
+      setCandidateState("error");
+      setError(candidateError instanceof Error ? candidateError.message : "Unable to update showtime candidate.");
+    }
+  }
+
+  async function handleBulkApproveCandidates() {
+    if (!token || !movieNight || !selectedCandidateIds.length) {
+      return;
+    }
+    setCandidateState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      await approveBulkShowtimeCandidates(token, movieNight.movieNightId, selectedCandidateIds);
+      setCandidateState("saved");
+      setMessage(`${selectedCandidateIds.length} showtime${selectedCandidateIds.length === 1 ? "" : "s"} approved for voting.`);
+      setSelectedCandidateIds([]);
+      await loadActive();
+    } catch (candidateError) {
+      setCandidateState("error");
+      setError(candidateError instanceof Error ? candidateError.message : "Unable to approve selected showtimes.");
+    }
+  }
+
+  async function handleOpenVoting() {
+    if (!token || !movieNight) {
+      return;
+    }
+    setVotingState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      const closesAt = new Date(votingClosesAt);
+      if (!votingClosesAt || Number.isNaN(closesAt.getTime()) || closesAt <= new Date()) {
+        setVotingState("error");
+        setError("Choose a future voting deadline.");
+        return;
+      }
+      await openVoting(token, movieNight.movieNightId, closesAt.toISOString());
+      setVotingState("saved");
+      setMessage("Voting is open for approved showtimes.");
+      await loadActive();
+    } catch (votingError) {
+      setVotingState("error");
+      setError(votingError instanceof Error ? votingError.message : "Unable to open voting.");
+    }
+  }
+
+  async function handleCloseVoting() {
+    if (!token || !movieNight || !window.confirm("Close voting now? Members will no longer be able to edit ballots.")) return;
+    setVotingState("saving");
+    setError(null);
+    try {
+      await closeVoting(token, movieNight.movieNightId);
+      setVotingState("saved");
+      setMessage("Voting is closed. Review the final standings and confirm a showtime.");
+      await loadActive();
+    } catch (votingError) {
+      setVotingState("error");
+      setError(votingError instanceof Error ? votingError.message : "Unable to close voting.");
+    }
+  }
+
   function toggleCachedShowtime(showtime: CachedShowtime) {
     const key = cacheKey(showtime);
     setSelectedCachedKeys((current) =>
@@ -309,6 +583,7 @@ export default function ClubAdminPage() {
     if (!token || !active?.movieNight) {
       return;
     }
+    if (!window.confirm("Confirm this showtime as the final club plan? This cannot be changed from the admin workspace.")) return;
     setConfirmState("saving");
     setError(null);
     setMessage(null);
@@ -320,6 +595,24 @@ export default function ClubAdminPage() {
     } catch (confirmError) {
       setConfirmState("error");
       setError(confirmError instanceof Error ? confirmError.message : "Unable to confirm showtime.");
+    }
+  }
+
+  async function handleCompleteMovieNight() {
+    if (!token || !active?.movieNight) {
+      return;
+    }
+    if (!window.confirm("Complete this movie night and move it to history?")) return;
+    setCompleteState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      await completeMovieNight(token, active.movieNight.movieNightId);
+      setCompleteState("saved");
+      router.push(`/clubs/${clubId}/history`);
+    } catch (completeError) {
+      setCompleteState("error");
+      setError(completeError instanceof Error ? completeError.message : "Unable to complete movie night.");
     }
   }
 
@@ -363,28 +656,63 @@ export default function ClubAdminPage() {
 
   const movieNight = active?.movieNight;
   const currentShowtimes = active?.showtimes || [];
+  const importedCandidates = currentShowtimes.filter((showtime) => showtime.status === "imported");
+  const approvedCandidates = currentShowtimes.filter((showtime) => showtime.status === "approved" || !showtime.status);
+  const rejectedCandidateCount = currentShowtimes.filter((showtime) => showtime.status === "rejected").length;
+  const candidateCounts = {
+    imported: importedCandidates.length,
+    approved: approvedCandidates.length,
+    rejected: rejectedCandidateCount,
+    duplicates: movieNight?.lastShowtimeImportSummary?.duplicateCount || 0,
+  };
+  const visibleCandidates = filterShowtimeCandidates(
+    currentShowtimes,
+    candidateDateFilter,
+    candidateTheaterFilter,
+    candidateFormatFilter
+  );
   const visibleCachedShowtimes = useMemo(
     () => filterCachedShowtimes(cachedShowtimes, selectedShowtimeDate, showtimeTimeBucket),
     [cachedShowtimes, selectedShowtimeDate, showtimeTimeBucket]
   );
   const selectedPoster = selectedMovie ? posterUrl(selectedMovie) : "";
   const groupedCurrentShowtimes = groupShowtimesByTheater(currentShowtimes, showtimeDateTime);
-  const canCreate = Boolean(selectedMovie && targetDate && createState !== "saving");
+  const hasCompletedPointer = movieNight?.status === "completed";
+  const canEditSetup = !movieNight || hasCompletedPointer || movieNight.status === "planning";
+  const canCreate = Boolean(selectedMovie && targetDate && createState !== "saving" && canEditSetup);
+  const setupDescription = !movieNight
+    ? "Pick a movie and date to unlock showtime import."
+    : hasCompletedPointer
+      ? "This club is ready for its next movie night."
+      : movieNight.status === "planning"
+        ? "This active movie night is still in setup and can be updated before voting opens."
+        : "Voting or confirmation has started, so the selected movie is locked.";
+  const createButtonLabel = !movieNight || hasCompletedPointer ? "Create movie night" : movieNight.status === "planning" ? "Update active setup" : "Movie locked";
   const statusLabel = formatStatus(movieNight?.status);
   const nextAction = getNextAction({
     hasMovieNight: Boolean(movieNight),
     hasSelectedMovie: Boolean(selectedMovie),
-    showtimeCount: currentShowtimes.length,
+    showtimeCount: approvedCandidates.length,
     status: movieNight?.status,
     resultCount: results?.standings?.length || 0,
   });
   const completedProgress = getCompletedProgress({
     hasMovieNight: Boolean(movieNight),
     hasSelectedMovie: Boolean(selectedMovie),
-    showtimeCount: currentShowtimes.length,
+    showtimeCount: approvedCandidates.length,
     status: movieNight?.status,
     resultCount: results?.standings?.length || 0,
   });
+
+  if (isWorkspaceLoading) {
+    return (
+      <AppShell>
+        <div className="grid min-h-[60vh] place-items-center text-slate-300">
+          <div className="flex items-center gap-3"><Loader2 className="size-5 animate-spin text-cyan-300" />Loading admin workspace...</div>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
@@ -403,71 +731,97 @@ export default function ClubAdminPage() {
               <Metric label="Status" value={statusLabel} tone={statusTone(movieNight?.status)} />
               <Metric label="Selected movie" value={movieNight?.movie.title || selectedMovie?.title || "Choose a movie"} />
               <Metric label="Target date" value={formatDate(movieNight?.targetDate || targetDate)} />
-              <Metric label="Showtimes" value={`${currentShowtimes.length} imported`} />
+              <Metric label="Showtimes" value={`${candidateCounts.approved} approved`} />
               <Metric label="Theaters" value={`${groupedCurrentShowtimes.length} listed`} />
               <Metric label="Ballots" value={results ? `${results.voteCount} submitted` : "Not open yet"} />
+              <Metric label="Voting closes" value={movieNight?.votingClosesAt ? formatDate(movieNight.votingClosesAt) : "Backend controlled"} />
             </div>
           </div>
         </section>
 
         <ProgressStrip completedCount={completedProgress} />
 
-        {error ? <Alert tone="rose">{error}</Alert> : null}
-        {message ? <Alert tone="green">{message}</Alert> : null}
+        {error ? <StatusAlert tone="danger" className="mb-4">{error}</StatusAlert> : null}
+        {message ? <StatusAlert tone="success" className="mb-4">{message}</StatusAlert> : null}
 
-        <Card className="mb-6 border-white/10 bg-slate-900/80 py-5 shadow-2xl shadow-black/20">
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Movie picker</h2>
-              <p className="text-sm text-slate-400">Choose the title members will vote showtimes for.</p>
+        <AdminStepCard
+          step="Step 1"
+          title="Movie"
+          description="Choose the title members will vote showtimes for. Discovery supports theatrical releases and upcoming movies."
+          status={movieNight || selectedMovie ? "complete" : "current"}
+          className="mb-6"
+        >
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              <FilterChip isActive={movieDiscoveryMode === "now-playing"} onClick={() => setMovieDiscoveryMode("now-playing")}>
+                Now Playing
+              </FilterChip>
+              <FilterChip isActive={movieDiscoveryMode === "coming-soon"} onClick={() => setMovieDiscoveryMode("coming-soon")}>
+                Coming Soon
+              </FilterChip>
             </div>
-            <span className="text-sm text-slate-500">{nowPlayingMovies.length} now playing</span>
-          </CardHeader>
-          <CardContent>
+            <span className="text-sm text-slate-500">{nowPlayingMovies.length} discovered</span>
+          </div>
             {isNowPlayingLoading ? (
               <div className="flex items-center gap-2 text-sm text-slate-400">
                 <Loader2 className="size-4 animate-spin" />
                 Loading current theatrical releases...
               </div>
             ) : (
-              <MovieGrid movies={nowPlayingMovies} selectedMovie={selectedMovie} onSelect={setSelectedMovie} emptyText="No now-playing movies loaded yet. Use search or try again shortly." compact />
+              <MovieGrid movies={nowPlayingMovies} selectedMovie={selectedMovie} onSelect={canEditSetup ? setSelectedMovie : undefined} emptyText="No now-playing movies loaded yet. Use search or try again shortly." compact />
             )}
-          </CardContent>
-        </Card>
+        </AdminStepCard>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <section className="space-y-6 lg:col-span-8">
-            <GracenoteImportPanel
-              cachedShowtimes={cachedShowtimes}
-              form={refreshForm}
-              gracenoteState={gracenoteState}
-              importState={importState}
-              importedCount={currentShowtimes.length}
-              movieNightExists={Boolean(movieNight)}
-              onClearSelection={clearCachedShowtimes}
-              onImport={handleImportShowtimes}
-              onRefresh={handleRefreshGracenote}
-              onSearch={handleSearchGracenote}
-              onSelectAll={selectAllCachedShowtimes}
-              onSelectedDateChange={setSelectedShowtimeDate}
-              onTimeBucketChange={setShowtimeTimeBucket}
-              onToggle={toggleCachedShowtime}
-              refreshState={refreshState}
-              selectedDate={selectedShowtimeDate}
-              selectedKeys={selectedCachedKeys}
-              setForm={setRefreshForm}
-              timeBucket={showtimeTimeBucket}
-              visibleShowtimes={visibleCachedShowtimes}
+            <PlanningPanel
+              form={planningForm}
+              hasMovieNight={Boolean(movieNight)}
+              isSaving={planningState === "saving"}
+              canEdit={Boolean(movieNight?.status === "planning")}
+              onChange={setPlanningForm}
+              onSave={handleSavePlanning}
+              usesAccountDefaults={usesAccountDefaults && !movieNight}
             />
 
-            <AdminShowtimes showtimes={currentShowtimes} />
+            <CandidateShowtimesPanel
+              counts={candidateCounts}
+              filters={{
+                date: candidateDateFilter,
+                theater: candidateTheaterFilter,
+                format: candidateFormatFilter,
+              }}
+              importState={importState}
+              isCandidateSaving={candidateState === "saving"}
+              movieNight={movieNight}
+              onBulkApprove={handleBulkApproveCandidates}
+              onFilterChange={(nextFilters) => {
+                setCandidateDateFilter(nextFilters.date);
+                setCandidateTheaterFilter(nextFilters.theater);
+                setCandidateFormatFilter(nextFilters.format);
+              }}
+              onImport={handleBackendImportShowtimes}
+              onStatusChange={handleCandidateStatus}
+              onToggleSelected={(showtimeId) =>
+                setSelectedCandidateIds((current) =>
+                  current.includes(showtimeId)
+                    ? current.filter((candidateId) => candidateId !== showtimeId)
+                    : [...current, showtimeId]
+                )
+              }
+              selectedIds={selectedCandidateIds}
+              showtimes={currentShowtimes}
+              visibleShowtimes={visibleCandidates}
+            />
+
+            <AdminShowtimes showtimes={approvedCandidates} />
           </section>
 
           <aside className="space-y-6 lg:col-span-4">
             <Card className="border-violet-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-violet-950/20">
               <CardHeader>
                 <h2 className="font-semibold text-white">Movie night setup</h2>
-                <p className="text-sm text-slate-400">{movieNight ? "This active movie night is connected to the showtime workflow." : "Pick a movie and date to unlock showtime import."}</p>
+                <p className="text-sm text-slate-400">{setupDescription}</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 {selectedMovie ? (
@@ -493,11 +847,24 @@ export default function ClubAdminPage() {
                   </p>
                 )}
                 <Field label="Target date">
-                  <Input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} className="border-white/10 bg-white/5 text-white" />
+                  <Input
+                    type="date"
+                    value={planningForm.targetDate}
+                    onChange={(event) => {
+                      setTargetDate(event.target.value);
+                      setPlanningForm((current) => ({
+                        ...current,
+                        targetDate: event.target.value,
+                        dateWindowStart: current.dateWindowStart || event.target.value,
+                        dateWindowEnd: current.dateWindowEnd || event.target.value,
+                      }));
+                    }}
+                    className="border-white/10 bg-white/5 text-white"
+                  />
                 </Field>
                 <Button onClick={handleCreateMovieNight} disabled={!canCreate} className="w-full bg-violet-500 text-white hover:bg-violet-600">
                   {createState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                  {movieNight ? "Replace active setup" : "Create movie night"}
+                  {createButtonLabel}
                 </Button>
               </CardContent>
             </Card>
@@ -516,7 +883,7 @@ export default function ClubAdminPage() {
                   </Button>
                 </form>
                 <div className="mt-5">
-                  <MovieGrid movies={movies} selectedMovie={selectedMovie} onSelect={setSelectedMovie} emptyText="Search results will appear here." compact />
+                  <MovieGrid movies={movies} selectedMovie={selectedMovie} onSelect={canEditSetup ? setSelectedMovie : undefined} emptyText="Search results will appear here." compact />
                 </div>
               </CardContent>
             </Card>
@@ -545,7 +912,33 @@ export default function ClubAdminPage() {
               </CardContent>
             </Card>
 
-            <AdminResults results={results} onConfirm={handleConfirm} isSaving={confirmState === "saving"} />
+            {movieNight?.status === "confirmed" && movieNight.confirmedShowtime ? (
+              <ConfirmedPlanCard showtime={movieNight.confirmedShowtime} />
+            ) : null}
+            <VotingControlCard
+              movieNight={movieNight}
+              showtimeCount={approvedCandidates.length}
+              voteCount={results?.voteCount || 0}
+              isSaving={votingState === "saving"}
+              votingClosesAt={votingClosesAt}
+              onVotingClosesAtChange={setVotingClosesAt}
+              onCloseVoting={handleCloseVoting}
+              onOpenVoting={handleOpenVoting}
+            />
+            <AdminResults
+              results={results}
+              onConfirm={handleConfirm}
+              isSaving={confirmState === "saving"}
+              canConfirm={Boolean(movieNight && movieNight.status === "voting" && isVotingClosed(movieNight))}
+            />
+            <AttendanceSummaryCard status={movieNight?.status} attendance={attendance} />
+            {movieNight?.status === "confirmed" ? (
+              <CompleteMovieNightCard
+                movieTitle={movieNight.movie.title}
+                isSaving={completeState === "saving"}
+                onComplete={handleCompleteMovieNight}
+              />
+            ) : null}
           </aside>
         </div>
       </div>
@@ -555,7 +948,7 @@ export default function ClubAdminPage() {
 
 function ProgressStrip({ completedCount }: { completedCount: number }) {
   return (
-    <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-6">
       {progressSteps.map((step, index) => {
         const Icon = step.icon;
         const isDone = index < completedCount;
@@ -610,7 +1003,7 @@ function MovieGrid({
 }: {
   movies: MovieSnapshot[];
   selectedMovie: MovieSnapshot | null;
-  onSelect: (movie: MovieSnapshot) => void;
+  onSelect?: (movie: MovieSnapshot) => void;
   emptyText: string;
   compact?: boolean;
 }) {
@@ -627,8 +1020,9 @@ function MovieGrid({
           <button
             key={`${movie.provider}-${movie.externalId}`}
             type="button"
-            onClick={() => onSelect(movie)}
-            className={`overflow-hidden rounded-lg border bg-white/5 text-left transition ${activeMovie ? "border-cyan-300/60 bg-cyan-400/10" : "border-white/10 hover:border-white/25 hover:bg-white/10"}`}
+            onClick={() => onSelect?.(movie)}
+            disabled={!onSelect}
+            className={`overflow-hidden rounded-lg border bg-white/5 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${activeMovie ? "border-cyan-300/60 bg-cyan-400/10" : "border-white/10 hover:border-white/25 hover:bg-white/10"}`}
           >
             <div className={`relative bg-slate-950 ${compact ? "h-32" : "h-64"}`}>
               {image ? (
@@ -647,6 +1041,237 @@ function MovieGrid({
         );
       })}
     </div>
+  );
+}
+
+function PlanningPanel({
+  canEdit,
+  form,
+  hasMovieNight,
+  isSaving,
+  onChange,
+  onSave,
+  usesAccountDefaults,
+}: {
+  canEdit: boolean;
+  form: MovieNightPlanningInput;
+  hasMovieNight: boolean;
+  isSaving: boolean;
+  onChange: (form: MovieNightPlanningInput) => void;
+  onSave: () => void;
+  usesAccountDefaults: boolean;
+}) {
+  return (
+    <AdminStepCard
+      step="Step 2"
+      title="Planning"
+      description="Save the reusable criteria the backend uses for multi-day showtime imports."
+      status={canEdit ? "current" : hasMovieNight ? "complete" : "blocked"}
+    >
+      <div className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <Field label="Target date">
+            <Input type="date" value={form.targetDate} onChange={(event) => onChange({ ...form, targetDate: event.target.value })} className="border-white/10 bg-white/5 text-white" />
+          </Field>
+          <Field label="Window start">
+            <Input type="date" value={form.dateWindowStart} onChange={(event) => onChange({ ...form, dateWindowStart: event.target.value })} className="border-white/10 bg-white/5 text-white" />
+          </Field>
+          <Field label="Window end">
+            <Input type="date" value={form.dateWindowEnd} onChange={(event) => onChange({ ...form, dateWindowEnd: event.target.value })} className="border-white/10 bg-white/5 text-white" />
+          </Field>
+        </div>
+        {usesAccountDefaults ? (
+          <StatusAlert tone="info">Started from your account defaults. Changes here apply only to this movie night.</StatusAlert>
+        ) : null}
+        <PlanningPreferencesFields
+          zipCode={form.zipCode}
+          radiusMiles={form.radiusMiles}
+          preferredFormats={form.preferredFormats || []}
+          onZipCodeChange={(zipCode) => onChange({ ...form, zipCode })}
+          onRadiusMilesChange={(radiusMiles) => onChange({ ...form, radiusMiles })}
+          onPreferredFormatsChange={(preferredFormats) => onChange({ ...form, preferredFormats })}
+          disabled={!canEdit && hasMovieNight}
+        />
+        <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <Field label="Timezone">
+            <Input value={form.timezone || "America/Chicago"} onChange={(event) => onChange({ ...form, timezone: event.target.value })} className="border-white/10 bg-white/5 text-white" />
+          </Field>
+          <Button onClick={onSave} disabled={!canEdit || isSaving} className="bg-violet-500 text-white hover:bg-violet-600">
+            {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+            Save planning
+          </Button>
+        </div>
+        {!hasMovieNight ? (
+          <StatusAlert tone="warning">Create the movie night first, then save planning updates and import showtimes.</StatusAlert>
+        ) : !canEdit ? (
+          <StatusAlert tone="warning">Planning criteria are locked after voting opens.</StatusAlert>
+        ) : null}
+      </div>
+    </AdminStepCard>
+  );
+}
+
+function CandidateShowtimesPanel({
+  counts,
+  filters,
+  importState,
+  isCandidateSaving,
+  movieNight,
+  onBulkApprove,
+  onFilterChange,
+  onImport,
+  onStatusChange,
+  onToggleSelected,
+  selectedIds,
+  showtimes,
+  visibleShowtimes,
+}: {
+  counts: { imported: number; approved: number; rejected: number; duplicates: number };
+  filters: { date: string; theater: string; format: string };
+  importState: ActionState;
+  isCandidateSaving: boolean;
+  movieNight?: ActiveMovieNightResponse["movieNight"];
+  onBulkApprove: () => void;
+  onFilterChange: (filters: { date: string; theater: string; format: string }) => void;
+  onImport: () => void;
+  onStatusChange: (showtimeId: string, status: "approved" | "rejected") => void;
+  onToggleSelected: (showtimeId: string) => void;
+  selectedIds: string[];
+  showtimes: Showtime[];
+  visibleShowtimes: Showtime[];
+}) {
+  const dates = getAvailableCandidateValues(showtimes, (showtime) => showtime.localDate || getShowtimeDateKey(showtimeDateTime(showtime)));
+  const theaters = getAvailableCandidateValues(showtimes, (showtime) => showtime.theaterName);
+  const formats = getAvailableCandidateValues(showtimes, (showtime) => showtime.screenFormat || "Standard");
+  const groupedShowtimes = groupShowtimesByTheater(visibleShowtimes, showtimeDateTime);
+  const summary = movieNight?.lastShowtimeImportSummary;
+  const importInProgress = ["queued", "running"].includes(movieNight?.showtimeImportStatus || "");
+
+  return (
+    <AdminStepCard
+      step="Step 3"
+      title="Showtimes"
+      description="Import candidates from the saved planning window, then approve only the options members should rank."
+      status={counts.approved ? "complete" : movieNight ? "current" : "blocked"}
+    >
+      <div className="space-y-5">
+        <div className="grid grid-cols-2 gap-2 text-center text-xs md:grid-cols-4">
+          <MiniStat value={`${counts.imported}`} label="imported" />
+          <MiniStat value={`${counts.approved}`} label="approved" tone="green" />
+          <MiniStat value={`${counts.rejected}`} label="rejected" />
+          <MiniStat value={`${counts.duplicates}`} label="duplicates" tone="cyan" />
+        </div>
+
+        <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-white">Backend import</p>
+              <p className="mt-1 text-sm text-slate-400">
+                Uses {movieNight?.dateWindowStart || "start TBD"} through {movieNight?.dateWindowEnd || "end TBD"} near {movieNight?.zipCode || "ZIP TBD"}.
+              </p>
+            </div>
+            <Button onClick={onImport} disabled={!movieNight || importState === "saving" || importInProgress} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+              {importState === "saving" || importInProgress ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
+              {importInProgress ? "Import in progress" : "Import showtimes"}
+            </Button>
+          </div>
+          {summary?.requestedDates?.length ? (
+            <p className="mt-3 text-xs text-slate-500">
+              Last import checked {summary.requestedDates.join(", ")} and skipped {summary.duplicateCount || 0} duplicate{summary.duplicateCount === 1 ? "" : "s"}.
+            </p>
+          ) : null}
+          {movieNight?.showtimeImportStatus === "failed" ? (
+            <StatusAlert tone="danger" className="mt-3">{summary?.errorMessage || "The provider import failed. Try again shortly."}</StatusAlert>
+          ) : null}
+        </div>
+
+        {showtimes.length ? (
+          <>
+            <div className="grid gap-3 md:grid-cols-3">
+              <Field label="Date">
+                <NativeSelect value={filters.date} onChange={(value) => onFilterChange({ ...filters, date: value })} options={["all", ...dates]} />
+              </Field>
+              <Field label="Theater">
+                <NativeSelect value={filters.theater} onChange={(value) => onFilterChange({ ...filters, theater: value })} options={["all", ...theaters]} />
+              </Field>
+              <Field label="Format">
+                <NativeSelect value={filters.format} onChange={(value) => onFilterChange({ ...filters, format: value })} options={["all", ...formats]} />
+              </Field>
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-sm text-slate-300">{visibleShowtimes.length} visible / {selectedIds.length} selected</span>
+              <Button type="button" size="sm" onClick={onBulkApprove} disabled={!selectedIds.length || isCandidateSaving} className="bg-green-500 text-slate-950 hover:bg-green-400">
+                {isCandidateSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                Approve selected
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {groupedShowtimes.map((group) => (
+                <TheaterShowtimeSection key={group.key} group={group}>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {group.showtimes.map((showtime) => {
+                      const selected = selectedIds.includes(showtime.showtimeId);
+                      return (
+                        <div key={showtime.showtimeId} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                          <button type="button" onClick={() => onToggleSelected(showtime.showtimeId)} className="w-full text-left">
+                            <ShowtimeCardBody checked={selected} dateTime={showtimeDateTime(showtime)} screenFormat={showtime.screenFormat} ticketURI={showtime.ticketURI} />
+                          </button>
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                            <span className={`rounded px-2 py-1 text-xs ${showtime.status === "approved" ? "bg-green-400/10 text-green-100" : showtime.status === "rejected" ? "bg-rose-400/10 text-rose-100" : "bg-amber-400/10 text-amber-100"}`}>
+                              {showtime.status || "approved"}
+                            </span>
+                            <div className="flex gap-2">
+                              <Button type="button" size="sm" variant="outline" onClick={() => onStatusChange(showtime.showtimeId, "approved")} disabled={isCandidateSaving || showtime.status === "approved"} className="border-white/10 text-slate-100 hover:bg-white/10">
+                                Approve
+                              </Button>
+                              <Button type="button" size="sm" variant="ghost" onClick={() => onStatusChange(showtime.showtimeId, "rejected")} disabled={isCandidateSaving || showtime.status === "rejected"} className="text-rose-100 hover:bg-rose-400/10">
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </TheaterShowtimeSection>
+              ))}
+            </div>
+          </>
+        ) : (
+          <EmptyState
+            title="No imported candidates"
+            description="Save planning criteria, then import showtimes. The backend will fetch each date in the saved window."
+            className="bg-white/5"
+          />
+        )}
+      </div>
+    </AdminStepCard>
+  );
+}
+
+function NativeSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="h-9 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm text-white outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+    >
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {option === "all" ? "All" : option}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -703,21 +1328,21 @@ function GracenoteImportPanel({
   const allVisibleSelected = Boolean(visibleShowtimes.length) && visibleSelectedCount === visibleShowtimes.length;
 
   return (
-    <Card className="border-cyan-300/20 bg-slate-900/85 py-6 shadow-2xl shadow-cyan-950/10">
-      <CardHeader className="gap-3">
+    <AdminStepCard
+      step="Step 2"
+      title="Showtimes"
+      description="Refresh provider data, search the local cache, then choose the showtimes members can rank."
+      status={importedCount ? "complete" : movieNightExists ? "current" : "blocked"}
+    >
+      <div className="space-y-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-white">Showtime import</h2>
-            <p className="text-sm text-slate-400">Refresh provider data, search the local cache, then choose the showtimes members can rank.</p>
-          </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs sm:min-w-72">
             <MiniStat value={`${cachedShowtimes.length}`} label="cached" />
             <MiniStat value={`${selectedCount}`} label="selected" tone="cyan" />
             <MiniStat value={`${importedCount}`} label="imported" tone="green" />
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-5">
+
         <form onSubmit={onSearch} className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
             <Field label="ZIP">
@@ -840,12 +1465,14 @@ function GracenoteImportPanel({
             </Button>
           </div>
         ) : (
-          <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">
-            No cached showtimes are loaded. Queue a refresh if needed, then search the cache for this movie.
-          </p>
+          <EmptyState
+            title="No cached showtimes loaded"
+            description="Queue a refresh if needed, then search the cache for this movie."
+            className="bg-white/5"
+          />
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </AdminStepCard>
   );
 }
 
@@ -922,35 +1549,44 @@ function AdminShowtimes({ showtimes }: { showtimes: Showtime[] }) {
   const groupedShowtimes = groupShowtimesByTheater(showtimes, showtimeDateTime);
 
   return (
-    <Card className="border-white/10 bg-slate-900/80 py-6">
-      <CardHeader>
-        <h2 className="text-xl font-semibold text-white">Imported candidate showtimes</h2>
-        <p className="text-sm text-slate-400">
-          {showtimes.length
-            ? `${showtimes.length} member-votable slot${showtimes.length === 1 ? "" : "s"} across ${groupedShowtimes.length} theater${groupedShowtimes.length === 1 ? "" : "s"}.`
-            : "Imported showtimes will appear here as the ballot options members rank."}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <AdminStepCard
+      step="Step 3"
+      title="Voting ballot"
+      description={
+        showtimes.length
+          ? `${showtimes.length} member-votable slot${showtimes.length === 1 ? "" : "s"} across ${groupedShowtimes.length} theater${groupedShowtimes.length === 1 ? "" : "s"}.`
+          : "Imported showtimes will appear here as the ballot options members rank."
+      }
+      status={showtimes.length ? "complete" : "current"}
+    >
+      <div className="space-y-3">
         {showtimes.length ? (
           groupedShowtimes.map((group) => (
             <TheaterShowtimeSection key={group.key} group={group}>
               <div className="grid gap-3 md:grid-cols-2">
                 {group.showtimes.map((showtime) => (
-                  <div key={showtime.showtimeId} className="rounded-lg border border-white/10 bg-white/5 p-4">
-                    <ShowtimeCardBody dateTime={showtimeDateTime(showtime)} screenFormat={showtime.screenFormat} ticketURI={showtime.ticketURI} />
-                  </div>
+                  <ShowtimeCard
+                    key={showtime.showtimeId}
+                    theaterName={showtime.theaterName}
+                    theaterLocation={showtime.theaterLocation}
+                    dateTime={showtimeDateTime(showtime)}
+                    screenFormat={showtime.screenFormat}
+                    ticketURI={showtime.ticketURI}
+                    compact
+                  />
                 ))}
               </div>
             </TheaterShowtimeSection>
           ))
         ) : (
-          <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">
-            Search cached showtimes above, select the best options, then import them for the member ballot.
-          </p>
+          <EmptyState
+            title="No ballot options yet"
+            description="Search cached showtimes above, select the best options, then import them for the member ballot."
+            className="bg-white/5"
+          />
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </AdminStepCard>
   );
 }
 
@@ -1039,6 +1675,70 @@ function groupShowtimesByTheater<T extends TheaterLikeShowtime>(
     .sort((first, second) => first.theaterName.localeCompare(second.theaterName));
 }
 
+function discoveryToMovieSnapshot(movie: MovieDiscoveryResult): MovieSnapshot {
+  return {
+    provider: movie.externalProvider,
+    externalProvider: movie.externalProvider,
+    externalId: movie.externalMovieId,
+    externalMovieId: movie.externalMovieId,
+    title: movie.title,
+    overview: movie.overview || "",
+    posterUrl: movie.posterUrl || "",
+    releaseDate: movie.releaseDate || "",
+    releaseYear: movie.releaseDate?.slice(0, 4) || "",
+    runtime: movie.runtimeMinutes,
+    genres: movie.genres || [],
+    status: movie.status,
+    metadataSnapshot: movie.metadataSnapshot,
+  };
+}
+
+function getAvailableCandidateValues(showtimes: Showtime[], getter: (showtime: Showtime) => string | undefined) {
+  return Array.from(
+    showtimes.reduce<Set<string>>((values, showtime) => {
+      const value = getter(showtime);
+      if (value) {
+        values.add(value);
+      }
+      return values;
+    }, new Set())
+  ).sort();
+}
+
+function filterShowtimeCandidates(showtimes: Showtime[], date: string, theater: string, format: string) {
+  return showtimes.filter((showtime) => {
+    if (date !== "all" && (showtime.localDate || getShowtimeDateKey(showtimeDateTime(showtime))) !== date) {
+      return false;
+    }
+    if (theater !== "all" && showtime.theaterName !== theater) {
+      return false;
+    }
+    if (format !== "all" && (showtime.screenFormat || "Standard") !== format) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function isVotingClosed(movieNight: ActiveMovieNightResponse["movieNight"]) {
+  if (movieNight.votingClosedAt) return true;
+  return Boolean(movieNight.votingClosesAt && Date.parse(movieNight.votingClosesAt) <= Date.now());
+}
+
+function toLocalDateTimeInput(value: string) {
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function defaultVotingDeadline(targetDate: string) {
+  const date = new Date(`${targetDate}T12:00:00`);
+  date.setDate(date.getDate() - 1);
+  date.setHours(20, 0, 0, 0);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
 function normalizeTheaterName(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ") || "unknown-theater";
 }
@@ -1116,6 +1816,15 @@ function cacheKey(showtime: CachedShowtime) {
   return `${showtime.PK}::${showtime.SK}`;
 }
 
+function inclusiveDateCount(startDate: string, endDate: string) {
+  const start = Date.parse(`${startDate}T00:00:00Z`);
+  const end = Date.parse(`${endDate}T00:00:00Z`);
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) {
+    return 1;
+  }
+  return Math.floor((end - start) / 86_400_000) + 1;
+}
+
 function cachedShowtimeDateTime(showtime: CachedShowtime) {
   return showtime.localDateTime || showtime.startsAtUtc;
 }
@@ -1124,20 +1833,23 @@ function AdminResults({
   results,
   onConfirm,
   isSaving,
+  canConfirm,
 }: {
   results: VoteResults | null;
   onConfirm: (showtimeId: string) => void;
   isSaving: boolean;
+  canConfirm: boolean;
 }) {
   const winner = results?.standings?.[0];
 
   return (
-    <Card className="border-white/10 bg-slate-900/80 py-6">
-      <CardHeader>
-        <h2 className="text-xl font-semibold text-white">Voting results</h2>
-        <p className="text-sm text-slate-400">{results ? `${results.voteCount} ballots submitted` : "Results appear after voting opens and members rank showtimes."}</p>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <AdminStepCard
+      step="Step 4"
+      title="Results and confirmation"
+      description={results ? `${results.voteCount} ballots submitted` : "Results appear after voting opens and members rank showtimes."}
+      status={winner ? "current" : "waiting"}
+    >
+      <div className="space-y-3">
         {winner ? (
           <div className="rounded-lg border border-green-400/30 bg-green-500/10 p-4">
             <p className="flex items-center gap-2 text-sm font-semibold text-green-100">
@@ -1148,10 +1860,17 @@ function AdminResults({
             <p className="mt-1 text-xs text-green-100/80">
               {winner.points} pts / {winner.firstChoiceVotes} first-choice / {winner.rankedVotes} total rankings
             </p>
-            <Button size="sm" onClick={() => onConfirm(winner.showtimeId)} disabled={isSaving} className="mt-4 bg-green-500 text-slate-950 hover:bg-green-400">
-              {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-              Confirm leader
-            </Button>
+            {canConfirm ? (
+              <StatusAlert tone="warning" className="mt-4">
+                Confirming makes this the final club plan and switches members from voting to RSVP and ticket tracking.
+              </StatusAlert>
+            ) : null}
+            {canConfirm ? (
+              <Button size="sm" onClick={() => onConfirm(winner.showtimeId)} disabled={isSaving} className="mt-4 bg-green-500 text-slate-950 hover:bg-green-400">
+                {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                Confirm leader
+              </Button>
+            ) : null}
           </div>
         ) : null}
 
@@ -1164,17 +1883,156 @@ function AdminResults({
                   <p className="mt-1 font-semibold text-white">{showtimeLabel(standing.showtime)}</p>
                   <p className="mt-1 text-xs text-slate-400">{standing.firstChoiceVotes} first-choice votes / {standing.rankedVotes} total rankings</p>
                 </div>
-                <Button size="sm" variant={index === 0 ? "outline" : "ghost"} onClick={() => onConfirm(standing.showtimeId)} disabled={isSaving} className="shrink-0 border-white/10 text-slate-100 hover:bg-white/10">
-                  Confirm
-                </Button>
+                {canConfirm ? (
+                  <Button size="sm" variant={index === 0 ? "outline" : "ghost"} onClick={() => onConfirm(standing.showtimeId)} disabled={isSaving} className="shrink-0 border-white/10 text-slate-100 hover:bg-white/10">
+                    Confirm
+                  </Button>
+                ) : null}
               </div>
             </div>
           ))
         ) : (
-          <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">
-            Once voting opens, standings will show ranked-choice points and a confirm action for the final showtime.
-          </p>
+          <EmptyState
+            title="No votes yet"
+            description="Once members submit ballots, standings will show ranked-choice points and a confirm action for the final showtime."
+            className="bg-white/5"
+          />
         )}
+      </div>
+    </AdminStepCard>
+  );
+}
+
+function VotingControlCard({
+  movieNight,
+  showtimeCount,
+  voteCount,
+  isSaving,
+  votingClosesAt,
+  onVotingClosesAtChange,
+  onCloseVoting,
+  onOpenVoting,
+}: {
+  movieNight?: ActiveMovieNightResponse["movieNight"];
+  showtimeCount: number;
+  voteCount: number;
+  isSaving: boolean;
+  votingClosesAt: string;
+  onVotingClosesAtChange: (value: string) => void;
+  onCloseVoting: () => void;
+  onOpenVoting: () => void;
+}) {
+  const status = movieNight?.status;
+  const votingOpen = status === "voting";
+  const votingClosed = Boolean(movieNight && isVotingClosed(movieNight));
+  const blocked = !movieNight || showtimeCount < 2;
+
+  return (
+    <AdminStepCard
+      step="Voting"
+      title="Voting status"
+      description="Backend status controls whether member ballots are editable. This panel makes that state explicit for admins."
+      status={votingOpen && !votingClosed ? "current" : blocked ? "blocked" : "waiting"}
+    >
+      <div className="space-y-3">
+        <Metric label="Current state" value={formatStatus(status)} tone={statusTone(status)} />
+        <Metric label="Close time" value={movieNight?.votingClosesAt ? formatDate(movieNight.votingClosesAt) : "Not scheduled"} />
+        <Metric label="Ballots" value={`${voteCount} submitted`} />
+        {blocked ? (
+          <StatusAlert tone="warning">
+            Create the movie night and approve at least 2 showtimes before members can vote.
+          </StatusAlert>
+        ) : votingOpen && !votingClosed ? (
+          <>
+            <StatusAlert tone="info">Members can save and edit ranked ballots until the scheduled deadline.</StatusAlert>
+            <Button onClick={onCloseVoting} disabled={isSaving} variant="outline" className="w-full border-amber-300/30 text-amber-100 hover:bg-amber-400/10">
+              {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Clock className="size-4" />}Close voting early
+            </Button>
+          </>
+        ) : votingOpen && votingClosed ? (
+          <StatusAlert tone="success">Voting is closed. Review standings and confirm the final showtime.</StatusAlert>
+        ) : (
+          <>
+            <StatusAlert tone="warning">
+              Voting is not open yet. Only approved showtimes will appear on the member ballot.
+            </StatusAlert>
+            <Field label="Voting deadline">
+              <Input type="datetime-local" value={votingClosesAt} onChange={(event) => onVotingClosesAtChange(event.target.value)} className="border-white/10 bg-white/5 text-white" />
+            </Field>
+            <Button onClick={onOpenVoting} disabled={isSaving || !movieNight || showtimeCount < 2 || !votingClosesAt} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+              {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}
+              Open voting
+            </Button>
+          </>
+        )}
+      </div>
+    </AdminStepCard>
+  );
+}
+
+function AttendanceSummaryCard({ status, attendance }: { status?: MovieNightStatus; attendance: AttendanceResponse | null }) {
+  const isConfirmed = status === "confirmed";
+
+  return (
+    <AdminStepCard
+      step="Attendance"
+      title="RSVP and tickets"
+      description="Member RSVP and ticket details appear after a final showtime is confirmed."
+      status={isConfirmed ? "current" : "waiting"}
+    >
+      {isConfirmed ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <MiniStat value={`${attendance?.summary.going ?? 0}`} label="going" tone="green" />
+            <MiniStat value={`${attendance?.summary.pending ?? 0}`} label="pending" tone="cyan" />
+            <MiniStat value={`${attendance?.summary.purchased ?? 0}`} label="tickets purchased" tone="green" />
+            <MiniStat value={`${attendance?.summary.maybe ?? 0}`} label="maybe" />
+          </div>
+          {attendance?.members.map((member) => (
+            <div key={member.userId} className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <p className="font-medium text-white">{member.name || member.email || "Club member"}</p>
+              {member.email ? <p className="text-xs text-slate-400">{member.email}</p> : null}
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span className="rounded bg-cyan-400/10 px-2 py-1 text-cyan-100">{member.rsvpStatus.replace("_", " ")}</span>
+                <span className="rounded bg-green-400/10 px-2 py-1 text-green-100">{member.ticketStatus.replace("_", " ")}</span>
+              </div>
+            </div>
+          ))}
+          {!attendance ? <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 className="size-4 animate-spin" />Loading attendance...</div> : null}
+        </div>
+      ) : (
+        <EmptyState
+          title="Attendance opens after confirmation"
+          description="Confirm the final showtime first. Members will then see RSVP and ticket controls on the active night page."
+          className="bg-white/5"
+        />
+      )}
+    </AdminStepCard>
+  );
+}
+
+function CompleteMovieNightCard({
+  movieTitle,
+  isSaving,
+  onComplete,
+}: {
+  movieTitle: string;
+  isSaving: boolean;
+  onComplete: () => void;
+}) {
+  return (
+    <Card className="border-green-400/20 bg-slate-900/80 py-6 shadow-2xl shadow-black/20">
+      <CardHeader>
+        <h2 className="text-xl font-semibold text-white">Complete movie night</h2>
+        <p className="text-sm text-slate-400">
+          Move {movieTitle} to history so the club can start planning the next movie night.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <Button onClick={onComplete} disabled={isSaving} className="w-full bg-green-500 text-slate-950 hover:bg-green-400">
+          {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+          Complete and view history
+        </Button>
       </CardContent>
     </Card>
   );
@@ -1246,14 +2104,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </div>
   );
-}
-
-function Alert({ children, tone }: { children: React.ReactNode; tone: "rose" | "green" }) {
-  const classes =
-    tone === "rose"
-      ? "mb-4 border-rose-400/30 bg-rose-500/10 text-rose-100"
-      : "mb-4 border-green-400/30 bg-green-500/10 text-green-100";
-  return <div className={`rounded-lg border p-3 text-sm ${classes}`}>{children}</div>;
 }
 
 function normalizeEmails(value: string) {
