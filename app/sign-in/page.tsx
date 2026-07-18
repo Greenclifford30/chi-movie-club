@@ -22,12 +22,10 @@ function SignInContent() {
   const searchParams = useSearchParams();
   const redirect = safeRedirect(searchParams.get("redirect"));
   const { isAuthenticated, isLoading, signIn, signInWithGoogle } = useAuth();
-  const { isAuthenticated, isLoading, signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
   useEffect(() => {
@@ -171,14 +169,6 @@ function AuthShellFallback() {
         Loading...
       </div>
     </main>
-  );
-}
-
-function GoogleMark() {
-  return (
-    <span className="grid size-4 place-items-center rounded-sm bg-white font-semibold leading-none text-[#4285f4]">
-      G
-    </span>
   );
 }
 

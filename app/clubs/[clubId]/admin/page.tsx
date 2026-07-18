@@ -7,8 +7,10 @@ import {
   Clapperboard,
   ClipboardCheck,
   Clock,
+  Copy,
   Film,
   Loader2,
+  MailPlus,
   MapPin,
   RefreshCcw,
   Search,
@@ -38,11 +40,13 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import {
   addShowtimes,
+  addClubMembers,
   approveBulkShowtimeCandidates,
   approveShowtimeCandidate,
   completeMovieNight,
   closeVoting,
   confirmShowtime,
+  createClubInvites,
   createMovieNight,
   discoverMovies,
   getActiveMovieNight,
@@ -61,7 +65,8 @@ import {
   updateMovieNightSetup,
 } from "@/lib/movie-club-api";
 import { formatDate, formatTime, posterUrl, showtimeDateTime, showtimeLabel } from "@/lib/movie-club-format";
-import type { ActiveMovieNightResponse, AttendanceResponse, CachedShowtime, ClubInvite, MovieDiscoveryResult, MovieNightPlanningInput, MovieNightStatus, MovieSnapshot, Showtime, VoteResults } from "@/lib/movie-club-types";
+import { localDateValue, validatePlanningWindow } from "@/lib/movie-club-planning";
+import type { ActiveMovieNightResponse, AttendanceResponse, CachedShowtime, ClubInvite, ClubMembership, MovieDiscoveryResult, MovieNightPlanningInput, MovieNightStatus, MovieSnapshot, Showtime, VoteResults } from "@/lib/movie-club-types";
 
 type ActionState = "idle" | "saving" | "saved" | "error";
 type LoadState = "idle" | "loading" | "error";
@@ -101,12 +106,14 @@ export default function ClubAdminPage() {
   const { clubId } = useParams<{ clubId: string }>();
   const router = useRouter();
   const { token } = useAuth();
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => localDateValue(), []);
   const [active, setActive] = useState<ActiveMovieNightResponse | null>(null);
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(true);
   const [attendance, setAttendance] = useState<AttendanceResponse | null>(null);
   const [invites, setInvites] = useState<ClubInvite[]>([]);
   const [inviteEmails, setInviteEmails] = useState("");
+  const [memberEmails, setMemberEmails] = useState("");
+  const [addedMembers, setAddedMembers] = useState<ClubMembership[]>([]);
   const [results, setResults] = useState<VoteResults | null>(null);
   const [movies, setMovies] = useState<MovieSnapshot[]>([]);
   const [nowPlayingMovies, setNowPlayingMovies] = useState<MovieSnapshot[]>([]);
@@ -129,7 +136,7 @@ export default function ClubAdminPage() {
   const [candidateDateFilter, setCandidateDateFilter] = useState("all");
   const [candidateTheaterFilter, setCandidateTheaterFilter] = useState("all");
   const [candidateFormatFilter, setCandidateFormatFilter] = useState("all");
-  const [refreshForm, setRefreshForm] = useState<GracenoteSearchForm>({ zip: DEFAULT_PLANNING_ZIP, radius: DEFAULT_PLANNING_RADIUS, numDays: 14, units: "mi" });
+  const refreshForm: GracenoteSearchForm = { zip: planningForm.zipCode, radius: planningForm.radiusMiles, numDays: inclusiveDateCount(planningForm.dateWindowStart, planningForm.dateWindowEnd), units: "mi" };
   const [usesAccountDefaults, setUsesAccountDefaults] = useState(false);
   const [cachedShowtimes, setCachedShowtimes] = useState<CachedShowtime[]>([]);
   const [selectedCachedKeys, setSelectedCachedKeys] = useState<string[]>([]);
@@ -145,6 +152,7 @@ export default function ClubAdminPage() {
   const [votingState, setVotingState] = useState<ActionState>("idle");
   const [votingClosesAt, setVotingClosesAt] = useState("");
   const [inviteState, setInviteState] = useState<ActionState>("idle");
+  const [memberState, setMemberState] = useState<ActionState>("idle");
   const [confirmState, setConfirmState] = useState<ActionState>("idle");
   const [completeState, setCompleteState] = useState<ActionState>("idle");
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
@@ -309,7 +317,7 @@ export default function ClubAdminPage() {
       setError("Movie night setup can only be replaced while it is still in planning.");
       return;
     }
-    const validationError = validatePlanningLocation(planningForm.zipCode, planningForm.radiusMiles);
+    const validationError = validatePlanningLocation(planningForm.zipCode, planningForm.radiusMiles) || validatePlanningWindow(planningForm, today);
     if (validationError) {
       setError(validationError);
       return;
@@ -364,7 +372,8 @@ export default function ClubAdminPage() {
       };
       await refreshGracenote(token, searchForm);
       setRefreshState("saved");
-      setMessage(`Gracenote refresh queued for ${searchForm.zip}, ${searchForm.radius}${searchForm.units}, ${searchForm.numDays} days.`);
+      setMessage("Provider refresh queued. Searching the cache for new matches…");
+      await searchCachedShowtimesWithRetry(15);
     } catch (refreshError) {
       setRefreshState("error");
       setError(refreshError instanceof Error ? refreshError.message : "Unable to queue Gracenote refresh.");
@@ -373,6 +382,10 @@ export default function ClubAdminPage() {
 
   async function handleSearchGracenote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await searchCachedShowtimesWithRetry(1);
+  }
+
+  async function searchCachedShowtimesWithRetry(attempts: number) {
     if (!token || !movieNight?.movie) {
       setError("Create a movie night before searching cached showtimes.");
       return;
@@ -386,23 +399,28 @@ export default function ClubAdminPage() {
     setError(null);
     setMessage(null);
     try {
-      const result = await searchGracenoteShowtimes(token, {
-        title: movieNight.movie.title,
-        provider: movieNight.movie.provider,
-        providerMovieId: movieNight.movie.externalId,
-        zip: planningForm.zipCode,
-        radius: planningForm.radiusMiles,
-        numDays: inclusiveDateCount(planningForm.dateWindowStart, planningForm.dateWindowEnd),
-        units: refreshForm.units,
-        startDate: planningForm.dateWindowStart,
-      });
-      setCachedShowtimes(result.showtimes);
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        if (attempt > 0) await delay(3000);
+        const isGracenoteMovie = movieNight.movie.provider.toLowerCase() === "gracenote";
+        const result = await searchGracenoteShowtimes(token, {
+          title: movieNight.movie.title,
+          provider: isGracenoteMovie ? movieNight.movie.provider : undefined,
+          providerMovieId: isGracenoteMovie ? movieNight.movie.externalId : undefined,
+          zip: planningForm.zipCode,
+          radius: planningForm.radiusMiles,
+          numDays: inclusiveDateCount(planningForm.dateWindowStart, planningForm.dateWindowEnd),
+          units: refreshForm.units,
+          startDate: planningForm.dateWindowStart,
+        });
+        if (result.showtimes.length) {
+          setCachedShowtimes(result.showtimes);
+          setGracenoteState("idle");
+          setMessage(`${result.showtimes.length} cached showtime${result.showtimes.length === 1 ? "" : "s"} found for ${movieNight.movie.title}.`);
+          return;
+        }
+      }
       setGracenoteState("idle");
-      setMessage(
-        result.showtimes.length
-          ? `${result.showtimes.length} cached showtime${result.showtimes.length === 1 ? "" : "s"} found for ${movieNight.movie.title}.`
-          : `No cached showtimes found for ${movieNight.movie.title} in this window. Queue a refresh, then search again.`
-      );
+      setMessage(`No cached matches are ready for ${movieNight.movie.title}. The provider may still be refreshing; use Search again shortly.`);
     } catch (searchError) {
       setGracenoteState("error");
       setError(searchError instanceof Error ? searchError.message : "Unable to search cached Gracenote showtimes.");
@@ -422,10 +440,10 @@ export default function ClubAdminPage() {
     setError(null);
     setMessage(null);
     try {
-      await addShowtimes(token, movieNight.movieNightId, { cachedShowtimeKeys });
+      const result = await addShowtimes(token, movieNight.movieNightId, { cachedShowtimeKeys });
       setImportState("saved");
       setSelectedCachedKeys([]);
-      setMessage(`${cachedShowtimeKeys.length} showtime${cachedShowtimeKeys.length === 1 ? "" : "s"} imported for member voting.`);
+      setMessage(`${result.showtimes.length} showtime${result.showtimes.length === 1 ? "" : "s"} imported for admin review.`);
       await loadActive();
     } catch (importError) {
       setImportState("error");
@@ -441,7 +459,7 @@ export default function ClubAdminPage() {
       setError("Planning criteria are locked after voting opens.");
       return;
     }
-    const validationError = validatePlanningLocation(planningForm.zipCode, planningForm.radiusMiles);
+    const validationError = validatePlanningLocation(planningForm.zipCode, planningForm.radiusMiles) || validatePlanningWindow(planningForm, today);
     if (validationError) {
       setError(validationError);
       return;
@@ -465,13 +483,22 @@ export default function ClubAdminPage() {
     if (!token || !movieNight) {
       return;
     }
+    const validationError = validatePlanningLocation(planningForm.zipCode, planningForm.radiusMiles) || validatePlanningWindow(planningForm, today);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    if (hasUnsavedPlanning) {
+      setError("Save the planning changes before importing showtimes.");
+      return;
+    }
     setImportState("saving");
     setError(null);
     setMessage(null);
     try {
       const result = await importShowtimesForMovieNight(token, movieNight.movieNightId);
       setImportState("saved");
-      setMessage(`Showtime import queued for ${result.importJob.requestedDates.length} day${result.importJob.requestedDates.length === 1 ? "" : "s"}. This page will update automatically.`);
+      setMessage(`Showtime search queued for ${result.importJob.requestedDates.length} day${result.importJob.requestedDates.length === 1 ? "" : "s"}. Results will update automatically.`);
       setSelectedCandidateIds([]);
       await loadActive();
     } catch (importError) {
@@ -651,8 +678,50 @@ export default function ClubAdminPage() {
     window.setTimeout(() => setCopiedInviteId(null), 1800);
   }
 
+  async function handleAddMembers(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+
+    const emails = normalizeEmails(memberEmails);
+    if (!emails.length) {
+      setError("Enter at least one valid email address.");
+      return;
+    }
+
+    setMemberState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await addClubMembers(token, clubId, emails);
+      setAddedMembers(result.members);
+      setMemberEmails("");
+      setMemberState("saved");
+      setMessage(`${result.members.length} member${result.members.length === 1 ? "" : "s"} added to this club.`);
+    } catch (memberError) {
+      setMemberState("error");
+      setError(memberError instanceof Error ? memberError.message : "Unable to add club members.");
+    }
+  }
+
   const movieNight = active?.movieNight;
+  const hasUnsavedPlanning = Boolean(movieNight && (
+    planningForm.targetDate !== (movieNight.targetDate || "") ||
+    planningForm.dateWindowStart !== (movieNight.dateWindowStart || "") ||
+    planningForm.dateWindowEnd !== (movieNight.dateWindowEnd || "") ||
+    planningForm.zipCode !== (movieNight.zipCode || "") ||
+    planningForm.radiusMiles !== (movieNight.radiusMiles || DEFAULT_PLANNING_RADIUS) ||
+    (planningForm.timezone || "America/Chicago") !== (movieNight.timezone || "America/Chicago") ||
+    JSON.stringify(planningForm.preferredFormats || []) !== JSON.stringify(movieNight.preferredFormats || [])
+  ));
   const currentShowtimes = active?.showtimes || [];
+  const confirmedShowtime = movieNight?.confirmedShowtime || active?.showtimes.find((showtime) => showtime.showtimeId === movieNight?.confirmedShowtimeId);
+  const confirmedStartTime = confirmedShowtime ? Date.parse(showtimeDateTime(confirmedShowtime)) : Number.NaN;
+  const canComplete = Number.isFinite(confirmedStartTime) && confirmedStartTime <= Date.now();
+  const planningValidationError = validatePlanningLocation(planningForm.zipCode, planningForm.radiusMiles) || validatePlanningWindow(planningForm, today);
+  const showImportRecovery = Boolean(movieNight && (
+    movieNight.showtimeImportStatus === "failed" ||
+    (movieNight.showtimeImportStatus === "completed" && currentShowtimes.length === 0)
+  ));
   const importedCandidates = currentShowtimes.filter((showtime) => showtime.status === "imported");
   const approvedCandidates = currentShowtimes.filter((showtime) => showtime.status === "approved" || !showtime.status);
   const rejectedCandidateCount = currentShowtimes.filter((showtime) => showtime.status === "rejected").length;
@@ -778,6 +847,8 @@ export default function ClubAdminPage() {
               canEdit={Boolean(movieNight?.status === "planning")}
               onChange={setPlanningForm}
               onSave={handleSavePlanning}
+              today={today}
+              validationError={planningValidationError}
               usesAccountDefaults={usesAccountDefaults && !movieNight}
             />
 
@@ -789,6 +860,7 @@ export default function ClubAdminPage() {
                 format: candidateFormatFilter,
               }}
               importState={importState}
+              hasUnsavedPlanning={hasUnsavedPlanning}
               isCandidateSaving={candidateState === "saving"}
               movieNight={movieNight}
               onBulkApprove={handleBulkApproveCandidates}
@@ -810,6 +882,28 @@ export default function ClubAdminPage() {
               showtimes={currentShowtimes}
               visibleShowtimes={visibleCandidates}
             />
+
+            {showImportRecovery ? (
+              <GracenoteImportPanel
+                cachedShowtimes={cachedShowtimes}
+                gracenoteState={gracenoteState}
+                importState={importState}
+                onClearSelection={clearCachedShowtimes}
+                onImport={handleImportShowtimes}
+                onRefresh={handleRefreshGracenote}
+                onSearch={handleSearchGracenote}
+                onSelectAll={selectAllCachedShowtimes}
+                onSelectedDateChange={setSelectedShowtimeDate}
+                onTimeBucketChange={setShowtimeTimeBucket}
+                onToggle={toggleCachedShowtime}
+                planning={planningForm}
+                refreshState={refreshState}
+                selectedDate={selectedShowtimeDate}
+                selectedKeys={selectedCachedKeys}
+                timeBucket={showtimeTimeBucket}
+                visibleShowtimes={visibleCachedShowtimes}
+              />
+            ) : null}
 
             <AdminShowtimes showtimes={approvedCandidates} />
           </section>
@@ -920,6 +1014,30 @@ export default function ClubAdminPage() {
 
             <Card className="border-white/10 bg-slate-900/80 py-6">
               <CardHeader>
+                <h2 className="font-semibold text-white">Club invites</h2>
+                <p className="text-sm text-slate-400">Create invite links for friends joining this club.</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form onSubmit={handleCreateInvites} className="space-y-3">
+                  <Field label="Email addresses">
+                    <textarea
+                      value={inviteEmails}
+                      onChange={(event) => setInviteEmails(event.target.value)}
+                      placeholder="name@example.com, friend@example.com"
+                      className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-500 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    />
+                  </Field>
+                  <Button type="submit" disabled={inviteState === "saving" || !inviteEmails.trim()} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+                    {inviteState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <MailPlus className="size-4" />}
+                    Create invites
+                  </Button>
+                </form>
+                <InviteList invites={invites} copiedInviteId={copiedInviteId} onCopy={handleCopyInvite} />
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/10 bg-slate-900/80 py-6">
+              <CardHeader>
                 <h2 className="font-semibold text-white">Club members</h2>
                 <p className="text-sm text-slate-400">Add existing platform users to this club as friends.</p>
               </CardHeader>
@@ -962,13 +1080,6 @@ export default function ClubAdminPage() {
               canConfirm={Boolean(movieNight && movieNight.status === "voting" && isVotingClosed(movieNight))}
             />
             <AttendanceSummaryCard status={movieNight?.status} attendance={attendance} />
-            {movieNight?.status === "confirmed" ? (
-              <CompleteMovieNightCard
-                movieTitle={movieNight.movie.title}
-                isSaving={completeState === "saving"}
-                onComplete={handleCompleteMovieNight}
-              />
-            ) : null}
           </aside>
         </div>
       </div>
@@ -1081,7 +1192,9 @@ function PlanningPanel({
   isSaving,
   onChange,
   onSave,
+  today,
   usesAccountDefaults,
+  validationError,
 }: {
   canEdit: boolean;
   form: MovieNightPlanningInput;
@@ -1089,7 +1202,9 @@ function PlanningPanel({
   isSaving: boolean;
   onChange: (form: MovieNightPlanningInput) => void;
   onSave: () => void;
+  today: string;
   usesAccountDefaults: boolean;
+  validationError: string | null;
 }) {
   return (
     <AdminStepCard
@@ -1101,13 +1216,13 @@ function PlanningPanel({
       <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-3">
           <Field label="Target date">
-            <Input type="date" value={form.targetDate} onChange={(event) => onChange({ ...form, targetDate: event.target.value })} className="border-white/10 bg-white/5 text-white" />
+            <Input type="date" min={today} value={form.targetDate} onChange={(event) => onChange({ ...form, targetDate: event.target.value })} className="border-white/10 bg-white/5 text-white" />
           </Field>
           <Field label="Window start">
-            <Input type="date" value={form.dateWindowStart} onChange={(event) => onChange({ ...form, dateWindowStart: event.target.value })} className="border-white/10 bg-white/5 text-white" />
+            <Input type="date" min={today} value={form.dateWindowStart} onChange={(event) => onChange({ ...form, dateWindowStart: event.target.value })} className="border-white/10 bg-white/5 text-white" />
           </Field>
           <Field label="Window end">
-            <Input type="date" value={form.dateWindowEnd} onChange={(event) => onChange({ ...form, dateWindowEnd: event.target.value })} className="border-white/10 bg-white/5 text-white" />
+            <Input type="date" min={form.dateWindowStart || today} value={form.dateWindowEnd} onChange={(event) => onChange({ ...form, dateWindowEnd: event.target.value })} className="border-white/10 bg-white/5 text-white" />
           </Field>
         </div>
         {usesAccountDefaults ? (
@@ -1122,11 +1237,12 @@ function PlanningPanel({
           onPreferredFormatsChange={(preferredFormats) => onChange({ ...form, preferredFormats })}
           disabled={!canEdit && hasMovieNight}
         />
+        {validationError ? <StatusAlert tone="warning">{validationError}</StatusAlert> : null}
         <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
           <Field label="Timezone">
             <Input value={form.timezone || "America/Chicago"} onChange={(event) => onChange({ ...form, timezone: event.target.value })} className="border-white/10 bg-white/5 text-white" />
           </Field>
-          <Button onClick={onSave} disabled={!canEdit || isSaving} className="bg-violet-500 text-white hover:bg-violet-600">
+          <Button onClick={onSave} disabled={!canEdit || isSaving || Boolean(validationError)} className="bg-violet-500 text-white hover:bg-violet-600">
             {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
             Save planning
           </Button>
@@ -1144,6 +1260,7 @@ function PlanningPanel({
 function CandidateShowtimesPanel({
   counts,
   filters,
+  hasUnsavedPlanning,
   importState,
   isCandidateSaving,
   movieNight,
@@ -1158,6 +1275,7 @@ function CandidateShowtimesPanel({
 }: {
   counts: { imported: number; approved: number; rejected: number; duplicates: number };
   filters: { date: string; theater: string; format: string };
+  hasUnsavedPlanning: boolean;
   importState: ActionState;
   isCandidateSaving: boolean;
   movieNight?: ActiveMovieNightResponse["movieNight"];
@@ -1176,6 +1294,7 @@ function CandidateShowtimesPanel({
   const groupedShowtimes = groupShowtimesByTheater(visibleShowtimes, showtimeDateTime);
   const summary = movieNight?.lastShowtimeImportSummary;
   const importInProgress = ["queued", "running"].includes(movieNight?.showtimeImportStatus || "");
+  const completedEmpty = movieNight?.showtimeImportStatus === "completed" && !showtimes.length;
 
   return (
     <AdminStepCard
@@ -1200,16 +1319,21 @@ function CandidateShowtimesPanel({
                 Uses {movieNight?.dateWindowStart || "start TBD"} through {movieNight?.dateWindowEnd || "end TBD"} near {movieNight?.zipCode || "ZIP TBD"}.
               </p>
             </div>
-            <Button onClick={onImport} disabled={!movieNight || importState === "saving" || importInProgress} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+            <Button onClick={onImport} disabled={!movieNight || importState === "saving" || importInProgress || hasUnsavedPlanning} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
               {importState === "saving" || importInProgress ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
               {importInProgress ? "Import in progress" : "Import showtimes"}
             </Button>
           </div>
           {summary?.requestedDates?.length ? (
-            <p className="mt-3 text-xs text-slate-500">
-              Last import checked {summary.requestedDates.join(", ")} and skipped {summary.duplicateCount || 0} duplicate{summary.duplicateCount === 1 ? "" : "s"}.
-            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
+              <MiniStat value={`${summary.requestedDates.length}`} label="days checked" />
+              <MiniStat value={`${summary.resultCount || 0}`} label="provider results" tone="cyan" />
+              <MiniStat value={`${summary.importedCount || 0}`} label="new candidates" tone="green" />
+              <MiniStat value={`${summary.duplicateCount || 0}`} label="duplicates" />
+            </div>
           ) : null}
+          {hasUnsavedPlanning ? <StatusAlert tone="warning" className="mt-3">Save your planning changes before searching for showtimes.</StatusAlert> : null}
+          {completedEmpty ? <StatusAlert tone="warning" className="mt-3">The provider search completed but returned no candidates. Use the guided recovery section below to refresh and search the provider cache.</StatusAlert> : null}
           {movieNight?.showtimeImportStatus === "failed" ? (
             <StatusAlert tone="danger" className="mt-3">{summary?.errorMessage || "The provider import failed. Try again shortly."}</StatusAlert>
           ) : null}
@@ -1307,11 +1431,8 @@ function NativeSelect({
 
 function GracenoteImportPanel({
   cachedShowtimes,
-  form,
   gracenoteState,
   importState,
-  importedCount,
-  movieNightExists,
   onClearSelection,
   onImport,
   onRefresh,
@@ -1320,19 +1441,16 @@ function GracenoteImportPanel({
   onSelectedDateChange,
   onTimeBucketChange,
   onToggle,
+  planning,
   refreshState,
   selectedDate,
   selectedKeys,
-  setForm,
   timeBucket,
   visibleShowtimes,
 }: {
   cachedShowtimes: CachedShowtime[];
-  form: { zip: string; radius: number; numDays: number; units: "mi" | "km" };
   gracenoteState: LoadState;
   importState: ActionState;
-  importedCount: number;
-  movieNightExists: boolean;
   onClearSelection: () => void;
   onImport: () => void;
   onRefresh: () => void;
@@ -1341,10 +1459,10 @@ function GracenoteImportPanel({
   onSelectedDateChange: (date: string) => void;
   onTimeBucketChange: (bucket: ShowtimeTimeBucket) => void;
   onToggle: (showtime: CachedShowtime) => void;
+  planning: MovieNightPlanningInput;
   refreshState: ActionState;
   selectedDate: string;
   selectedKeys: string[];
-  setForm: (form: { zip: string; radius: number; numDays: number; units: "mi" | "km" }) => void;
   timeBucket: ShowtimeTimeBucket;
   visibleShowtimes: CachedShowtime[];
 }) {
@@ -1358,32 +1476,23 @@ function GracenoteImportPanel({
   const allVisibleSelected = Boolean(visibleShowtimes.length) && visibleSelectedCount === visibleShowtimes.length;
 
   return (
-    <AdminStepCard
-      step="Step 2"
-      title="Showtimes"
-      description="Refresh provider data, search the local cache, then choose the showtimes members can rank."
-      status={importedCount ? "complete" : movieNightExists ? "current" : "blocked"}
-    >
+    <section className="rounded-lg border border-amber-300/20 bg-slate-900/80 p-5 shadow-2xl shadow-black/20">
       <div className="space-y-5">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-amber-200">Showtime recovery</p>
+          <h3 className="mt-1 text-xl font-semibold text-white">Refresh and search provider cache</h3>
+          <p className="mt-1 text-sm text-slate-400">The automatic search found no candidates. Refresh provider data, review matches, and import only the useful showtimes.</p>
+        </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="grid grid-cols-3 gap-2 text-center text-xs sm:min-w-72">
+          <div className="grid grid-cols-2 gap-2 text-center text-xs sm:min-w-48">
             <MiniStat value={`${cachedShowtimes.length}`} label="cached" />
             <MiniStat value={`${selectedCount}`} label="selected" tone="cyan" />
-            <MiniStat value={`${importedCount}`} label="imported" tone="green" />
           </div>
         </div>
 
         <form onSubmit={onSearch} className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-3">
-            <Field label="ZIP">
-              <Input value={form.zip} onChange={(event) => setForm({ ...form, zip: event.target.value })} className="border-white/10 bg-white/5 text-white" />
-            </Field>
-            <Field label={`Radius (${form.units})`}>
-              <Input type="number" min={1} value={form.radius} onChange={(event) => setForm({ ...form, radius: Number(event.target.value) })} className="border-white/10 bg-white/5 text-white" />
-            </Field>
-            <Field label="Days">
-              <Input type="number" min={1} value={form.numDays} onChange={(event) => setForm({ ...form, numDays: Number(event.target.value) })} className="border-white/10 bg-white/5 text-white" />
-            </Field>
+          <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-300">
+            Searching {planning.dateWindowStart} through {planning.dateWindowEnd} within {planning.radiusMiles} miles of {planning.zipCode}.
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -1391,30 +1500,26 @@ function GracenoteImportPanel({
               title="1. Queue fresh showtimes"
               description="Ask Gracenote to refresh the cache for this area. This can run before you search."
               icon={<RefreshCcw className="size-4" />}
-              disabled={!movieNightExists || refreshState === "saving"}
+              disabled={refreshState === "saving" || gracenoteState === "loading"}
               isLoading={refreshState === "saving"}
               onClick={onRefresh}
-              buttonText="Queue refresh"
+              buttonText="Refresh and search"
               tone="cyan"
             />
             <ActionPanel
               title="2. Search cached matches"
               description="Find cached showtimes for the selected movie and current search window."
               icon={<Search className="size-4" />}
-              disabled={!movieNightExists || gracenoteState === "loading"}
+              disabled={gracenoteState === "loading"}
               isLoading={gracenoteState === "loading"}
               type="submit"
-              buttonText="Search cache"
+              buttonText="Search again"
               tone="violet"
             />
           </div>
         </form>
 
-        {!movieNightExists ? (
-          <p className="rounded-lg border border-amber-300/20 bg-amber-400/10 p-3 text-sm text-amber-100">
-            Create a movie night before importing showtimes. The import will use that movie title and provider ID.
-          </p>
-        ) : cachedShowtimes.length ? (
+        {cachedShowtimes.length ? (
           <div className="space-y-3">
             <div className="space-y-3 rounded-lg border border-white/10 bg-slate-950/30 p-3">
               <div className="space-y-2">
@@ -1502,7 +1607,7 @@ function GracenoteImportPanel({
           />
         )}
       </div>
-    </AdminStepCard>
+    </section>
   );
 }
 
@@ -1855,6 +1960,10 @@ function inclusiveDateCount(startDate: string, endDate: string) {
   return Math.floor((end - start) / 86_400_000) + 1;
 }
 
+function delay(milliseconds: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
 function cachedShowtimeDateTime(showtime: CachedShowtime) {
   return showtime.localDateTime || showtime.startsAtUtc;
 }
@@ -2041,33 +2150,6 @@ function AttendanceSummaryCard({ status, attendance }: { status?: MovieNightStat
   );
 }
 
-function CompleteMovieNightCard({
-  movieTitle,
-  isSaving,
-  onComplete,
-}: {
-  movieTitle: string;
-  isSaving: boolean;
-  onComplete: () => void;
-}) {
-  return (
-    <Card className="border-green-400/20 bg-slate-900/80 py-6 shadow-2xl shadow-black/20">
-      <CardHeader>
-        <h2 className="text-xl font-semibold text-white">Complete movie night</h2>
-        <p className="text-sm text-slate-400">
-          Move {movieTitle} to history so the club can start planning the next movie night.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <Button onClick={onComplete} disabled={isSaving} className="w-full bg-green-500 text-slate-950 hover:bg-green-400">
-          {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-          Complete and view history
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
 function InviteList({
   invites,
   copiedInviteId,
@@ -2080,26 +2162,59 @@ function InviteList({
   if (!invites.length) {
     return (
       <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">
-        Added users will appear here after the backend creates their club memberships.
+        No invites yet. Add one or more email addresses to create shareable invite links.
       </p>
     );
   }
 
   return (
     <div className="space-y-3">
-      {members.map((member) => (
-        <div key={`${member.clubId}-${member.userId}`} className="rounded-lg border border-white/10 bg-white/5 p-3">
+      {invites.map((invite) => (
+        <div key={invite.inviteId} className="rounded-lg border border-white/10 bg-white/5 p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <p className="truncate font-medium text-white">{member.email || member.userId}</p>
-                <span className="rounded border border-green-300/20 bg-green-400/10 px-2 py-0.5 text-xs capitalize text-green-100">
-                  {member.role}
-                </span>
+                <p className="truncate font-medium text-white">{invite.email}</p>
+                <InviteBadge status={invite.status} />
               </div>
-              <p className="mt-1 text-xs text-slate-400">{member.status || "active"} membership</p>
+              <p className="mt-1 text-xs text-slate-400">Expires {formatDate(invite.expiresAt)}</p>
             </div>
+            {invite.inviteUrl ? (
+              <Button type="button" size="icon" variant="ghost" title="Copy invite link" onClick={() => onCopy(invite)} className="shrink-0 text-slate-200 hover:bg-white/10">
+                {copiedInviteId === invite.inviteId ? <Check className="size-4 text-green-300" /> : <Copy className="size-4" />}
+              </Button>
+            ) : null}
           </div>
+          {invite.inviteUrl ? <p className="mt-2 truncate text-xs text-cyan-200">{invite.inviteUrl}</p> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InviteBadge({ status }: { status: ClubInvite["status"] }) {
+  const classes: Record<ClubInvite["status"], string> = {
+    pending: "border-amber-300/20 bg-amber-400/10 text-amber-100",
+    accepted: "border-green-300/20 bg-green-400/10 text-green-100",
+    expired: "border-rose-300/20 bg-rose-400/10 text-rose-100",
+  };
+  return <span className={`rounded border px-2 py-0.5 text-xs capitalize ${classes[status]}`}>{status}</span>;
+}
+
+function MemberList({ members }: { members: ClubMembership[] }) {
+  if (!members.length) {
+    return <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">Added users will appear here after the backend creates their club memberships.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {members.map((member) => (
+        <div key={`${member.clubId}-${member.userId}`} className="rounded-lg border border-white/10 bg-white/5 p-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <p className="truncate font-medium text-white">{member.email || member.userId}</p>
+            <span className="rounded border border-green-300/20 bg-green-400/10 px-2 py-0.5 text-xs capitalize text-green-100">{member.role}</span>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">{member.status || "active"} membership</p>
         </div>
       ))}
     </div>
