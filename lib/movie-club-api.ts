@@ -124,6 +124,14 @@ export function createClubInvites(token: string, clubId: string, emails: string[
   );
 }
 
+export function addClubMembers(token: string, clubId: string, emails: string[]) {
+  return apiFetch<{ members: ClubMembership[] }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/members`,
+    { method: "POST", body: JSON.stringify({ emails, role: "friend" }) }
+  );
+}
+
 export function getInvite(token: string) {
   return publicApiFetch<{ invite: ClubInvite }>(`/invites/${encodeURIComponent(token)}`);
 }

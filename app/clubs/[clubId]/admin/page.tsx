@@ -7,10 +7,8 @@ import {
   Clapperboard,
   ClipboardCheck,
   Clock,
-  Copy,
   Film,
   Loader2,
-  MailPlus,
   MapPin,
   RefreshCcw,
   Search,
@@ -45,7 +43,6 @@ import {
   completeMovieNight,
   closeVoting,
   confirmShowtime,
-  createClubInvites,
   createMovieNight,
   discoverMovies,
   getActiveMovieNight,
@@ -869,6 +866,39 @@ export default function ClubAdminPage() {
               </CardContent>
             </Card>
 
+            {movieNight?.status === "confirmed" ? (
+              <Card className="border-green-400/20 bg-slate-900/80 py-6 shadow-2xl shadow-green-950/10">
+                <CardHeader>
+                  <h2 className="font-semibold text-white">End event</h2>
+                  <p className="text-sm text-slate-400">
+                    {canComplete
+                      ? "The confirmed showtime has passed. End this event to save it to club history."
+                      : "RSVP remains open until the confirmed showtime has passed."}
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {confirmedShowtime ? (
+                    <p className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-300">
+                      {formatDate(showtimeDateTime(confirmedShowtime))} at {formatTime(showtimeDateTime(confirmedShowtime))}
+                    </p>
+                  ) : (
+                    <p className="mb-4 rounded-lg border border-amber-300/20 bg-amber-400/10 p-3 text-sm text-amber-100">
+                      A confirmed showtime is required before this event can be ended.
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={handleCompleteMovieNight}
+                    disabled={!canComplete || completeState === "saving"}
+                    className="w-full bg-green-500 text-slate-950 hover:bg-green-400"
+                  >
+                    {completeState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                    End event
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <Card className="border-white/10 bg-slate-900/80 py-6 shadow-2xl shadow-black/20">
               <CardHeader>
                 <h2 className="font-semibold text-white">Movie search</h2>
@@ -890,25 +920,25 @@ export default function ClubAdminPage() {
 
             <Card className="border-white/10 bg-slate-900/80 py-6">
               <CardHeader>
-                <h2 className="font-semibold text-white">Club invites</h2>
-                <p className="text-sm text-slate-400">Create invite links for friends joining this club.</p>
+                <h2 className="font-semibold text-white">Club members</h2>
+                <p className="text-sm text-slate-400">Add existing platform users to this club as friends.</p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <form onSubmit={handleCreateInvites} className="space-y-3">
-                  <Field label="Email addresses">
+                <form onSubmit={handleAddMembers} className="space-y-3">
+                  <Field label="Platform user emails">
                     <textarea
-                      value={inviteEmails}
-                      onChange={(event) => setInviteEmails(event.target.value)}
-                      placeholder="name@example.com, friend@example.com"
+                      value={memberEmails}
+                      onChange={(event) => setMemberEmails(event.target.value)}
+                      placeholder="signed-in-user@example.com, friend@example.com"
                       className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-500 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     />
                   </Field>
-                  <Button type="submit" disabled={inviteState === "saving" || !inviteEmails.trim()} className="w-full bg-violet-500 text-white hover:bg-violet-600">
-                    {inviteState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <MailPlus className="size-4" />}
-                    Create invites
+                  <Button type="submit" disabled={memberState === "saving" || !memberEmails.trim()} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+                    {memberState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                    Add as friends
                   </Button>
                 </form>
-                <InviteList invites={invites} copiedInviteId={copiedInviteId} onCopy={handleCopyInvite} />
+                <MemberList members={addedMembers} />
               </CardContent>
             </Card>
 
@@ -2050,51 +2080,30 @@ function InviteList({
   if (!invites.length) {
     return (
       <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">
-        No invites yet. Add one or more email addresses to create shareable invite links.
+        Added users will appear here after the backend creates their club memberships.
       </p>
     );
   }
 
   return (
     <div className="space-y-3">
-      {invites.map((invite) => (
-        <div key={invite.inviteId} className="rounded-lg border border-white/10 bg-white/5 p-3">
+      {members.map((member) => (
+        <div key={`${member.clubId}-${member.userId}`} className="rounded-lg border border-white/10 bg-white/5 p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <p className="truncate font-medium text-white">{invite.email}</p>
-                <InviteBadge status={invite.status} />
+                <p className="truncate font-medium text-white">{member.email || member.userId}</p>
+                <span className="rounded border border-green-300/20 bg-green-400/10 px-2 py-0.5 text-xs capitalize text-green-100">
+                  {member.role}
+                </span>
               </div>
-              <p className="mt-1 text-xs text-slate-400">Expires {formatDate(invite.expiresAt)}</p>
+              <p className="mt-1 text-xs text-slate-400">{member.status || "active"} membership</p>
             </div>
-            {invite.inviteUrl ? (
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                title="Copy invite link"
-                onClick={() => onCopy(invite)}
-                className="shrink-0 text-slate-200 hover:bg-white/10"
-              >
-                {copiedInviteId === invite.inviteId ? <Check className="size-4 text-green-300" /> : <Copy className="size-4" />}
-              </Button>
-            ) : null}
           </div>
-          {invite.inviteUrl ? <p className="mt-2 truncate text-xs text-cyan-200">{invite.inviteUrl}</p> : null}
         </div>
       ))}
     </div>
   );
-}
-
-function InviteBadge({ status }: { status: ClubInvite["status"] }) {
-  const classes: Record<ClubInvite["status"], string> = {
-    pending: "border-amber-300/20 bg-amber-400/10 text-amber-100",
-    accepted: "border-green-300/20 bg-green-400/10 text-green-100",
-    expired: "border-rose-300/20 bg-rose-400/10 text-rose-100",
-  };
-
-  return <span className={`rounded border px-2 py-0.5 text-xs capitalize ${classes[status]}`}>{status}</span>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -2181,8 +2190,11 @@ function getNextAction({
   status?: MovieNightStatus;
   resultCount: number;
 }) {
-  if (status === "confirmed" || status === "completed") {
-    return "The final showtime is set. Keep invites current and use the active night page for RSVP follow-up.";
+  if (status === "completed") {
+    return "This movie night is complete and available in club history.";
+  }
+  if (status === "confirmed") {
+    return "The final showtime is set. RSVP remains open until the showtime has passed.";
   }
   if (resultCount) {
     return "Voting results are ready. Review the current leader and confirm the final showtime.";

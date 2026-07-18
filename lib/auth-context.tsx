@@ -87,6 +87,21 @@ function tokenFromSession(session: CognitoUserSession) {
   return session.getIdToken().getJwtToken();
 }
 
+function decodeJwtPayload(token: string) {
+  const [, payload] = token.split(".");
+  if (!payload) {
+    return {};
+  }
+
+  try {
+    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, "=");
+    return JSON.parse(atob(paddedPayload)) as { email?: unknown; exp?: unknown };
+  } catch {
+    return {};
+  }
+}
+
 function emailFromSession(session: CognitoUserSession, fallbackEmail: string) {
   const payload = session.getIdToken().decodePayload() as { email?: unknown };
   return typeof payload.email === "string" && payload.email ? payload.email : fallbackEmail;

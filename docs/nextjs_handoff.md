@@ -7,6 +7,7 @@ The Next.js app has been migrated from the prototype `/api/showtimes` and `/api/
 The app now includes:
 
 - Cognito SRP sign-in at `/sign-in`.
+- Cognito Hosted UI Google sign-in at `/sign-in` and `/sign-up`.
 - Seeded club selection at `/clubs`.
 - Active movie night at `/clubs/[clubId]`.
 - Admin setup at `/clubs/[clubId]/admin`.
@@ -21,6 +22,7 @@ Required:
 NEXT_PUBLIC_COGNITO_USER_POOL_ID=
 NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID=
 NEXT_PUBLIC_AWS_REGION=
+NEXT_PUBLIC_COGNITO_DOMAIN=
 API_HOST=
 API_KEY=
 ```
@@ -30,6 +32,31 @@ Optional local defaults:
 ```txt
 NEXT_PUBLIC_DEFAULT_CLUB_ID=the-cinephiles
 NEXT_PUBLIC_DEFAULT_CLUB_NAME=The Cinephiles
+NEXT_PUBLIC_COGNITO_REDIRECT_URI=http://localhost:3000/auth/callback
+NEXT_PUBLIC_COGNITO_OAUTH_SCOPES=openid email profile
+```
+
+Google sign-in uses Cognito Hosted UI with authorization code + PKCE. Configure Google as an identity provider in the Cognito user pool using the Google OAuth2 client ID and secret, enable the provider on the app client, and add these Cognito callback URLs:
+
+```txt
+http://localhost:3000/auth/callback
+https://<production-domain>/auth/callback
+```
+
+The Google OAuth consent screen also needs Cognito's provider callback URL:
+
+```txt
+https://<cognito-domain>/oauth2/idpresponse
+```
+
+Terraform now provisions the Cognito Hosted UI domain, Google identity provider, and OAuth-enabled web app client. Set the `chimovieclub_cognito_*` Terraform variables, then use these outputs for the Next.js environment:
+
+```txt
+chimovieclub_cognito_user_pool_id -> NEXT_PUBLIC_COGNITO_USER_POOL_ID
+chimovieclub_cognito_web_client_id -> NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID
+chimovieclub_cognito_region -> NEXT_PUBLIC_AWS_REGION
+chimovieclub_cognito_hosted_ui_domain -> NEXT_PUBLIC_COGNITO_DOMAIN
+chimovieclub_cognito_google_idp_callback_url -> Google OAuth authorized redirect URI
 ```
 
 `NEXT_PUBLIC_TMDB_API_KEY` is no longer used by the frontend. Movie search must go through the backend `GET /movies/search` route so TMDB credentials stay server-side.
@@ -54,6 +81,7 @@ The frontend wrappers target these API Gateway routes:
 
 - `GET /movies/search?query={query}&page={page}`
 - `POST /clubs/{clubId}/movie-nights`
+- `POST /clubs/{clubId}/members`
 - `GET /clubs/{clubId}/movie-nights/active`
 - `POST /movie-nights/{movieNightId}/showtimes`
 - `POST /admin/showtimes/gracenote/refresh`
@@ -69,15 +97,18 @@ Typed contracts live in `lib/movie-club-types.ts`.
 
 - `/` redirects to `/clubs`.
 - `/admin` redirects to `/clubs` because admin now requires club context.
-- `/sign-in` performs Cognito SRP sign-in with the configured user pool/client.
+- `/sign-in` performs Cognito SRP sign-in with the configured user pool/client or redirects to Cognito Hosted UI for Google sign-in.
+- `/auth/callback` completes Google sign-in by exchanging the Cognito authorization code for tokens and storing the Cognito ID token.
 - `/clubs` currently shows the seeded MVP club. Replace this with a real club-list endpoint when available.
 - `/clubs/[clubId]` renders no-active-night, planning, voting, confirmed, completed, and cancelled states.
 - `/clubs/[clubId]/admin` supports backend movie search, movie-night creation, manual showtime entry, Gracenote refresh queueing, vote results, and final showtime confirmation.
+- `/clubs/[clubId]/admin` also supports adding existing platform users to the current club as `friend` members by email.
 - `/clubs/[clubId]/history` renders completed/confirmed movie nights returned by the backend.
 
 ## Known Backend Coupling
 
 - The current backend does not expose a club-list endpoint, so the frontend uses `NEXT_PUBLIC_DEFAULT_CLUB_ID`.
+- The admin member form expects `POST /clubs/{clubId}/members` to accept `{ "emails": string[], "role": "friend" }`, validate that each email belongs to an existing platform user, create active club memberships, and return `{ "members": ClubMembership[] }`.
 - The backend's `update-rsvp-lambda` currently accepts `ticketStatus` values `not_purchased` and `purchased`; `need_help` is intentionally not sent yet.
 - Manual showtime entry sends `startsAtUtc` from a `datetime-local` control. If the backend tightens UTC validation, convert this value to an ISO UTC string before submission.
 - Gracenote cache selection/import UI is not complete because no cache search/list endpoint is exposed. The admin page can queue refreshes and manually add showtimes.
