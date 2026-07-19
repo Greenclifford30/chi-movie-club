@@ -14,6 +14,7 @@ import {
   MapPin,
   RefreshCcw,
   Search,
+  Share2,
   ShieldCheck,
   Ticket,
   Vote,
@@ -156,8 +157,13 @@ export default function ClubAdminPage() {
   const [confirmState, setConfirmState] = useState<ActionState>("idle");
   const [completeState, setCompleteState] = useState<ActionState>("idle");
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
+  const [supportsNativeShare, setSupportsNativeShare] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSupportsNativeShare(typeof navigator.share === "function");
+  }, []);
 
   async function loadActive() {
     if (!token) {
@@ -678,6 +684,23 @@ export default function ClubAdminPage() {
     window.setTimeout(() => setCopiedInviteId(null), 1800);
   }
 
+  async function handleShareInvite(invite: ClubInvite) {
+    if (!invite.inviteUrl || typeof navigator.share !== "function") {
+      return;
+    }
+
+    setError(null);
+    setMessage(null);
+    try {
+      const wasShared = await shareInviteNatively(invite);
+      if (wasShared) {
+        setMessage(`Invite shared for ${invite.email}.`);
+      }
+    } catch (shareError) {
+      setError(shareError instanceof Error ? shareError.message : "Unable to share invite.");
+    }
+  }
+
   async function handleAddMembers(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
@@ -1031,7 +1054,13 @@ export default function ClubAdminPage() {
                     Create invites
                   </Button>
                 </form>
-                <InviteList invites={invites} copiedInviteId={copiedInviteId} onCopy={handleCopyInvite} />
+                <InviteList
+                  invites={invites}
+                  copiedInviteId={copiedInviteId}
+                  supportsNativeShare={supportsNativeShare}
+                  onCopy={handleCopyInvite}
+                  onShare={handleShareInvite}
+                />
               </CardContent>
             </Card>
 
@@ -2153,14 +2182,43 @@ function AttendanceSummaryCard({ status, attendance }: { status?: MovieNightStat
   );
 }
 
-function InviteList({
+export function inviteShareData(invite: ClubInvite): ShareData {
+  const clubName = invite.clubName || "this movie club";
+  return {
+    title: `Join ${clubName}`,
+    text: `You're invited to join ${clubName} for movie nights.`,
+    url: invite.inviteUrl,
+  };
+}
+
+export async function shareInviteNatively(invite: ClubInvite): Promise<boolean> {
+  if (!invite.inviteUrl || typeof navigator.share !== "function") {
+    return false;
+  }
+
+  try {
+    await navigator.share(inviteShareData(invite));
+    return true;
+  } catch (shareError) {
+    if (shareError instanceof DOMException && shareError.name === "AbortError") {
+      return false;
+    }
+    throw shareError;
+  }
+}
+
+export function InviteList({
   invites,
   copiedInviteId,
+  supportsNativeShare,
   onCopy,
+  onShare,
 }: {
   invites: ClubInvite[];
   copiedInviteId: string | null;
+  supportsNativeShare: boolean;
   onCopy: (invite: ClubInvite) => void;
+  onShare: (invite: ClubInvite) => void;
 }) {
   if (!invites.length) {
     return (
@@ -2183,9 +2241,32 @@ function InviteList({
               <p className="mt-1 text-xs text-slate-400">Expires {formatDate(invite.expiresAt)}</p>
             </div>
             {invite.inviteUrl ? (
-              <Button type="button" size="icon" variant="ghost" title="Copy invite link" onClick={() => onCopy(invite)} className="shrink-0 text-slate-200 hover:bg-white/10">
-                {copiedInviteId === invite.inviteId ? <Check className="size-4 text-green-300" /> : <Copy className="size-4" />}
-              </Button>
+              <div className="flex shrink-0 items-center gap-1">
+                {supportsNativeShare ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Share invite for ${invite.email}`}
+                    onClick={() => onShare(invite)}
+                    className="text-cyan-200 hover:bg-white/10"
+                  >
+                    <Share2 className="size-4" />
+                    Share
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  title="Copy invite link"
+                  aria-label={`Copy invite link for ${invite.email}`}
+                  onClick={() => onCopy(invite)}
+                  className="text-slate-200 hover:bg-white/10"
+                >
+                  {copiedInviteId === invite.inviteId ? <Check className="size-4 text-green-300" /> : <Copy className="size-4" />}
+                </Button>
+              </div>
             ) : null}
           </div>
           {invite.inviteUrl ? <p className="mt-2 truncate text-xs text-cyan-200">{invite.inviteUrl}</p> : null}
