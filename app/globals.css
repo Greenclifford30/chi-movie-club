@@ -135,10 +135,12 @@
 
   html {
     color-scheme: dark;
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
   }
 
   body {
-    min-height: 100vh;
+    min-height: 100dvh;
     background:
       radial-gradient(circle at top left, rgba(139, 92, 246, 0.18), transparent 32%),
       radial-gradient(circle at top right, rgba(34, 211, 238, 0.12), transparent 30%),
@@ -149,6 +151,20 @@
   ::selection {
     background: rgba(56, 189, 248, 0.3);
     color: rgb(248 250 252);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

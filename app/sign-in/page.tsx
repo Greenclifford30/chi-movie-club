@@ -63,7 +63,7 @@ function SignInContent() {
 
   return (
     <AuthShell>
-      <form onSubmit={handleSubmit} className="flex flex-col justify-center p-8">
+      <form onSubmit={handleSubmit} className="flex flex-col justify-center p-5 sm:p-8">
         <div className="mb-8">
           <p className="text-sm text-slate-400">Welcome back</p>
           <h2 className="mt-1 text-2xl font-semibold text-white">Sign in</h2>
@@ -138,14 +138,14 @@ function SignInContent() {
 
 function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="grid min-h-screen place-items-center px-4 py-10 text-slate-50">
+    <main className="grid min-h-dvh place-items-center px-4 py-4 text-slate-50 sm:py-10">
       <section className="grid w-full max-w-5xl overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 shadow-2xl shadow-black/40 md:grid-cols-[1.05fr_0.95fr]">
-        <div className="flex min-h-[520px] flex-col justify-between bg-[linear-gradient(145deg,rgba(139,92,246,0.22),rgba(34,211,238,0.08))] p-8">
+        <div className="flex flex-col justify-between bg-[linear-gradient(145deg,rgba(139,92,246,0.22),rgba(34,211,238,0.08))] p-5 md:min-h-[520px] md:p-8">
           <div className="flex items-center gap-2 font-semibold">
             <Film className="size-6" />
             <span>Movie Club</span>
           </div>
-          <div>
+          <div className="hidden md:block">
             <p className="mb-3 text-sm font-medium text-cyan-200">Chicago movie nights</p>
             <h1 className="max-w-md text-4xl font-semibold tracking-tight text-white md:text-5xl">
               Plan movie nights without the group-chat chaos.

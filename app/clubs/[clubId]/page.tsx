@@ -22,7 +22,7 @@ import type { ActiveMovieNightResponse, RsvpStatus, Showtime, TicketStatus } fro
 export default function ActiveClubPage() {
   const { clubId } = useParams<{ clubId: string }>();
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, identityProvider } = useAuth();
   const [data, setData] = useState<ActiveMovieNightResponse | null>(null);
   const [rankings, setRankings] = useState<string[]>(["", "", ""]);
   const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus>("going");
@@ -145,7 +145,7 @@ export default function ActiveClubPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className={`mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 ${isVoting || isConfirmed ? "pb-28 sm:pb-28 md:pb-6" : ""}`}>
         {isLoading || isRedirecting ? (
           <section className="grid min-h-[520px] place-items-center rounded-lg border border-white/10 bg-slate-900/70">
             <div className="flex flex-col items-center gap-3 text-slate-300">
@@ -179,10 +179,10 @@ export default function ActiveClubPage() {
             {message ? <StatusAlert tone="success" className="mb-4">{message}</StatusAlert> : null}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-              <section className="space-y-6 lg:col-span-8">
-                <div id="details" className="overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 shadow-2xl shadow-black/30">
+              <div className="contents">
+                <div id="details" className={`${isConfirmed ? "order-3" : "order-1"} scroll-mt-20 overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 shadow-2xl shadow-black/30 lg:order-none lg:col-span-8`}>
                   <div className="grid grid-cols-1 md:grid-cols-[260px_1fr]">
-                    <div className="relative min-h-[390px] bg-slate-950">
+                    <div className="relative h-64 bg-slate-950 sm:h-80 md:h-auto md:min-h-[390px]">
                       {imageUrl ? (
                         <Image src={imageUrl} alt={movie.title} fill className="object-cover" sizes="260px" />
                       ) : (
@@ -196,7 +196,7 @@ export default function ActiveClubPage() {
                         <span className="rounded bg-violet-400/15 px-2 py-1 text-xs font-medium text-violet-100">{movieNight.status}</span>
                         <span className="rounded bg-cyan-400/10 px-2 py-1 text-xs font-medium text-cyan-100">{movie.releaseYear || "Release year TBD"}</span>
                       </div>
-                      <h1 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">{movie.title}</h1>
+                      <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl md:text-5xl">{movie.title}</h1>
                       <p className="mt-4 max-w-2xl text-slate-300">{movie.overview || "Movie details will appear here once the admin saves a full movie snapshot."}</p>
                       <div className="mt-6 grid gap-3 sm:grid-cols-3">
                         <Stat icon={<CalendarDays className="size-5 text-amber-300" />} label="Target" value={formatDate(movieNight.targetDate)} />
@@ -207,9 +207,13 @@ export default function ActiveClubPage() {
                   </div>
                 </div>
 
-                {isConfirmed && confirmedShowtime ? <ConfirmedPlanCard showtime={confirmedShowtime} secondaryAction={token ? <AddToCalendarButton movieNightId={movieNight.movieNightId} status={movieNight.status} token={token} /> : null} /> : null}
+                {isConfirmed && confirmedShowtime ? (
+                  <div className="order-1 lg:order-none lg:col-span-8">
+                    <ConfirmedPlanCard showtime={confirmedShowtime} secondaryAction={token ? <AddToCalendarButton movieNight={movieNight} showtime={confirmedShowtime} status={movieNight.status} token={token} identityProvider={identityProvider} /> : null} />
+                  </div>
+                ) : null}
 
-                <section id="showtimes" className="space-y-4">
+                <section id="showtimes" className={`${isConfirmed ? "order-4" : "order-3"} scroll-mt-20 space-y-4 lg:order-none lg:col-span-8`}>
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="text-2xl font-semibold text-white">Candidate showtimes</h2>
                     <span className="text-sm text-slate-400">{Object.keys(groupedShowtimes).length} theaters</span>
@@ -252,9 +256,9 @@ export default function ActiveClubPage() {
                     />
                   )}
                 </section>
-              </section>
+              </div>
 
-              <aside className="space-y-6 lg:col-span-4">
+              <aside className="order-2 space-y-6 lg:order-none lg:col-span-4 lg:col-start-9 lg:row-span-3 lg:row-start-1">
                 {isConfirmed ? (
                   <Card id="rsvp" className="sticky top-24 border-green-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-black/20">
                     <CardHeader>
@@ -264,17 +268,10 @@ export default function ActiveClubPage() {
                     <CardContent className="space-y-4">
                       <Segmented label="RSVP" value={rsvpStatus} onChange={(value) => setRsvpStatus(value as RsvpStatus)} options={[["going", "Going"], ["maybe", "Maybe"], ["not_going", "Not going"]]} />
                       <Segmented label="Ticket" value={ticketStatus} onChange={(value) => setTicketStatus(value as TicketStatus)} options={[["not_purchased", "Not purchased"], ["purchased", "Purchased"]]} />
-                      <Button onClick={saveRsvp} disabled={isSaving} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+                      <Button onClick={saveRsvp} disabled={isSaving} className="hidden w-full bg-violet-500 text-white hover:bg-violet-600 md:flex">
                         {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                         Update RSVP
                       </Button>
-                      {token ? (
-                        <AddToCalendarButton
-                          movieNightId={movieNight.movieNightId}
-                          status={movieNight.status}
-                          token={token}
-                        />
-                      ) : null}
                     </CardContent>
                   </Card>
                 ) : (
@@ -300,6 +297,7 @@ export default function ActiveClubPage() {
                           disabled={!isVoting}
                           isSaving={isSaving}
                           hasSavedVote={hasSavedVote}
+                          hideMobileSave
                           onChange={updateRanking}
                           onSave={saveVote}
                         />
@@ -315,6 +313,21 @@ export default function ActiveClubPage() {
                 )}
               </aside>
             </div>
+            {isVoting && hasShowtimes ? (
+              <div className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 border-t border-white/10 bg-slate-950/95 p-3 backdrop-blur-xl md:hidden">
+                <Button className="mx-auto flex w-full max-w-lg bg-violet-500 text-white hover:bg-violet-600" disabled={!rankings.some(Boolean) || isSaving} onClick={saveVote}>
+                  {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}
+                  {hasSavedVote ? "Update ranked vote" : "Save ranked vote"}
+                </Button>
+              </div>
+            ) : isConfirmed ? (
+              <div className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 border-t border-white/10 bg-slate-950/95 p-3 backdrop-blur-xl md:hidden">
+                <Button onClick={saveRsvp} disabled={isSaving} className="mx-auto flex w-full max-w-lg bg-violet-500 text-white hover:bg-violet-600">
+                  {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                  Update RSVP
+                </Button>
+              </div>
+            ) : null}
           </>
         )}
       </div>
@@ -352,7 +365,7 @@ function Segmented({
             key={optionValue}
             type="button"
             onClick={() => onChange(optionValue)}
-            className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
+            className={`min-h-11 rounded-lg border px-3 py-2 text-left text-sm transition ${
               value === optionValue
                 ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100"
                 : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"

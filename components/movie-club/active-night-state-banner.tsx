@@ -36,7 +36,7 @@ export function ActiveNightStateBanner({
   const Icon = state.icon;
 
   return (
-    <section className={`mb-6 rounded-lg border p-5 shadow-2xl ${toneClasses[state.tone]}`}>
+    <section className={`mb-6 scroll-mt-20 rounded-lg border p-4 shadow-2xl sm:p-5 ${toneClasses[state.tone]}`}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex gap-4">
           <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white">
@@ -58,7 +58,7 @@ export function ActiveNightStateBanner({
           </div>
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
-          <Button asChild className={state.primaryClass}>
+          <Button asChild className={`w-full sm:w-auto ${state.primaryClass}`}>
             <a href={state.anchor}>{state.action}</a>
           </Button>
           {(status === "completed" || status === "cancelled") && (

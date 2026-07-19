@@ -782,7 +782,7 @@ export default function ClubAdminPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         <section className="mb-6 border-b border-white/10 pb-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -790,7 +790,7 @@ export default function ClubAdminPage() {
                 <CalendarClock className="size-4" />
                 <span>Club admin workspace</span>
               </div>
-              <h1 className="text-4xl font-semibold tracking-tight text-white">Manage movie night</h1>
+              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Manage movie night</h1>
               <p className="mt-2 max-w-2xl text-slate-300">{nextAction}</p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[32rem]">
@@ -810,12 +810,13 @@ export default function ClubAdminPage() {
         {error ? <StatusAlert tone="danger" className="mb-4">{error}</StatusAlert> : null}
         {message ? <StatusAlert tone="success" className="mb-4">{message}</StatusAlert> : null}
 
+        <div className="mb-6 grid gap-6 lg:grid-cols-12 lg:items-start">
         <AdminStepCard
           step="Step 1"
           title="Movie"
           description="Choose the title members will vote showtimes for. Discovery supports theatrical releases and upcoming movies."
           status={movieNight || selectedMovie ? "complete" : "current"}
-          className="mb-6"
+          className="lg:col-span-8"
         >
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap gap-2">
@@ -836,7 +837,75 @@ export default function ClubAdminPage() {
             ) : (
               <MovieGrid movies={nowPlayingMovies} selectedMovie={selectedMovie} onSelect={canEditSetup ? setSelectedMovie : undefined} emptyText="No now-playing movies loaded yet. Use search or try again shortly." compact />
             )}
+            <div className="mt-6 border-t border-white/10 pt-5">
+              <h3 className="font-semibold text-white">Search the movie catalog</h3>
+              <p className="mt-1 text-sm text-slate-400">Use search when a title is missing from the current theatrical lists.</p>
+              <form onSubmit={handleSearch} className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by movie title" className="border-white/10 bg-white/5 text-white" />
+                <Button type="submit" disabled={movieSearchState === "saving" || searchQuery.trim().length < 2} className="bg-violet-500 text-white hover:bg-violet-600">
+                  {movieSearchState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                  Search movies
+                </Button>
+              </form>
+              {movies.length ? (
+                <div className="mt-5">
+                  <MovieGrid movies={movies} selectedMovie={selectedMovie} onSelect={canEditSetup ? setSelectedMovie : undefined} emptyText="Search results will appear here." compact />
+                </div>
+              ) : null}
+            </div>
         </AdminStepCard>
+
+        <Card className="border-violet-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-violet-950/20 lg:col-span-4">
+          <CardHeader>
+            <h2 className="font-semibold text-white">Movie night setup</h2>
+            <p className="text-sm text-slate-400">{setupDescription}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {selectedMovie ? (
+              <div className="flex gap-3">
+                <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded bg-slate-950">
+                  {selectedPoster ? (
+                    <Image src={selectedPoster} alt={selectedMovie.title} fill sizes="80px" className="object-cover" />
+                  ) : (
+                    <div className="grid h-full place-items-center text-slate-500">
+                      <Film className="size-8" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-white">{selectedMovie.title}</p>
+                  <p className="mt-1 text-sm text-slate-400">{selectedMovie.releaseYear || selectedMovie.releaseDate || "Release date TBD"}</p>
+                  {selectedMovie.overview ? <p className="mt-2 line-clamp-3 text-sm text-slate-300">{selectedMovie.overview}</p> : null}
+                </div>
+              </div>
+            ) : (
+              <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">
+                Select a theatrical title or search the movie catalog.
+              </p>
+            )}
+            <Field label="Target date">
+              <Input
+                type="date"
+                value={planningForm.targetDate}
+                onChange={(event) => {
+                  setTargetDate(event.target.value);
+                  setPlanningForm((current) => ({
+                    ...current,
+                    targetDate: event.target.value,
+                    dateWindowStart: current.dateWindowStart || event.target.value,
+                    dateWindowEnd: current.dateWindowEnd || event.target.value,
+                  }));
+                }}
+                className="border-white/10 bg-white/5 text-white"
+              />
+            </Field>
+            <Button onClick={handleCreateMovieNight} disabled={!canCreate} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+              {createState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+              {createButtonLabel}
+            </Button>
+          </CardContent>
+        </Card>
+        </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <section className="space-y-6 lg:col-span-8">
@@ -908,60 +977,9 @@ export default function ClubAdminPage() {
             <AdminShowtimes showtimes={approvedCandidates} />
           </section>
 
-          <aside className="space-y-6 lg:col-span-4">
-            <Card className="border-violet-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-violet-950/20">
-              <CardHeader>
-                <h2 className="font-semibold text-white">Movie night setup</h2>
-                <p className="text-sm text-slate-400">{setupDescription}</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {selectedMovie ? (
-                  <div className="flex gap-3">
-                    <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded bg-slate-950">
-                      {selectedPoster ? (
-                        <Image src={selectedPoster} alt={selectedMovie.title} fill sizes="80px" className="object-cover" />
-                      ) : (
-                        <div className="grid h-full place-items-center text-slate-500">
-                          <Film className="size-8" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-white">{selectedMovie.title}</p>
-                      <p className="mt-1 text-sm text-slate-400">{selectedMovie.releaseYear || selectedMovie.releaseDate || "Release date TBD"}</p>
-                      {selectedMovie.overview ? <p className="mt-2 line-clamp-3 text-sm text-slate-300">{selectedMovie.overview}</p> : null}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">
-                    Select a now-playing title above, or search the movie catalog below.
-                  </p>
-                )}
-                <Field label="Target date">
-                  <Input
-                    type="date"
-                    value={planningForm.targetDate}
-                    onChange={(event) => {
-                      setTargetDate(event.target.value);
-                      setPlanningForm((current) => ({
-                        ...current,
-                        targetDate: event.target.value,
-                        dateWindowStart: current.dateWindowStart || event.target.value,
-                        dateWindowEnd: current.dateWindowEnd || event.target.value,
-                      }));
-                    }}
-                    className="border-white/10 bg-white/5 text-white"
-                  />
-                </Field>
-                <Button onClick={handleCreateMovieNight} disabled={!canCreate} className="w-full bg-violet-500 text-white hover:bg-violet-600">
-                  {createState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                  {createButtonLabel}
-                </Button>
-              </CardContent>
-            </Card>
-
+          <aside className="flex flex-col gap-6 lg:col-span-4">
             {movieNight?.status === "confirmed" ? (
-              <Card className="border-green-400/20 bg-slate-900/80 py-6 shadow-2xl shadow-green-950/10">
+              <Card className="order-5 border-green-400/20 bg-slate-900/80 py-6 shadow-2xl shadow-green-950/10">
                 <CardHeader>
                   <h2 className="font-semibold text-white">End event</h2>
                   <p className="text-sm text-slate-400">
@@ -993,26 +1011,7 @@ export default function ClubAdminPage() {
               </Card>
             ) : null}
 
-            <Card className="border-white/10 bg-slate-900/80 py-6 shadow-2xl shadow-black/20">
-              <CardHeader>
-                <h2 className="font-semibold text-white">Movie search</h2>
-                <p className="text-sm text-slate-400">Use catalog search when a title is missing from now playing.</p>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSearch} className="flex flex-col gap-3">
-                  <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by movie title" className="border-white/10 bg-white/5 text-white" />
-                  <Button type="submit" disabled={movieSearchState === "saving" || searchQuery.trim().length < 2} className="bg-violet-500 text-white hover:bg-violet-600">
-                    {movieSearchState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                    Search movies
-                  </Button>
-                </form>
-                <div className="mt-5">
-                  <MovieGrid movies={movies} selectedMovie={selectedMovie} onSelect={canEditSetup ? setSelectedMovie : undefined} emptyText="Search results will appear here." compact />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-white/10 bg-slate-900/80 py-6">
+            <Card className="order-6 border-white/10 bg-slate-900/80 py-6">
               <CardHeader>
                 <h2 className="font-semibold text-white">Club invites</h2>
                 <p className="text-sm text-slate-400">Create invite links for friends joining this club.</p>
@@ -1024,7 +1023,7 @@ export default function ClubAdminPage() {
                       value={inviteEmails}
                       onChange={(event) => setInviteEmails(event.target.value)}
                       placeholder="name@example.com, friend@example.com"
-                      className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-500 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-base text-white outline-none transition placeholder:text-slate-500 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
                     />
                   </Field>
                   <Button type="submit" disabled={inviteState === "saving" || !inviteEmails.trim()} className="w-full bg-violet-500 text-white hover:bg-violet-600">
@@ -1036,7 +1035,7 @@ export default function ClubAdminPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-slate-900/80 py-6">
+            <Card className="order-7 border-white/10 bg-slate-900/80 py-6">
               <CardHeader>
                 <h2 className="font-semibold text-white">Club members</h2>
                 <p className="text-sm text-slate-400">Add existing platform users to this club as friends.</p>
@@ -1048,7 +1047,7 @@ export default function ClubAdminPage() {
                       value={memberEmails}
                       onChange={(event) => setMemberEmails(event.target.value)}
                       placeholder="signed-in-user@example.com, friend@example.com"
-                      className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-500 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-base text-white outline-none transition placeholder:text-slate-500 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
                     />
                   </Field>
                   <Button type="submit" disabled={memberState === "saving" || !memberEmails.trim()} className="w-full bg-violet-500 text-white hover:bg-violet-600">
@@ -1061,25 +1060,29 @@ export default function ClubAdminPage() {
             </Card>
 
             {movieNight?.status === "confirmed" && movieNight.confirmedShowtime ? (
-              <ConfirmedPlanCard showtime={movieNight.confirmedShowtime} />
+              <div className="order-3"><ConfirmedPlanCard showtime={movieNight.confirmedShowtime} /></div>
             ) : null}
-            <VotingControlCard
-              movieNight={movieNight}
-              showtimeCount={approvedCandidates.length}
-              voteCount={results?.voteCount || 0}
-              isSaving={votingState === "saving"}
-              votingClosesAt={votingClosesAt}
-              onVotingClosesAtChange={setVotingClosesAt}
-              onCloseVoting={handleCloseVoting}
-              onOpenVoting={handleOpenVoting}
-            />
-            <AdminResults
-              results={results}
-              onConfirm={handleConfirm}
-              isSaving={confirmState === "saving"}
-              canConfirm={Boolean(movieNight && movieNight.status === "voting" && isVotingClosed(movieNight))}
-            />
-            <AttendanceSummaryCard status={movieNight?.status} attendance={attendance} />
+            <div className="order-1">
+              <VotingControlCard
+                movieNight={movieNight}
+                showtimeCount={approvedCandidates.length}
+                voteCount={results?.voteCount || 0}
+                isSaving={votingState === "saving"}
+                votingClosesAt={votingClosesAt}
+                onVotingClosesAtChange={setVotingClosesAt}
+                onCloseVoting={handleCloseVoting}
+                onOpenVoting={handleOpenVoting}
+              />
+            </div>
+            <div className="order-2">
+              <AdminResults
+                results={results}
+                onConfirm={handleConfirm}
+                isSaving={confirmState === "saving"}
+                canConfirm={Boolean(movieNight && movieNight.status === "voting" && isVotingClosed(movieNight))}
+              />
+            </div>
+            <div className="order-4"><AttendanceSummaryCard status={movieNight?.status} attendance={attendance} /></div>
           </aside>
         </div>
       </div>
@@ -1089,7 +1092,7 @@ export default function ClubAdminPage() {
 
 function ProgressStrip({ completedCount }: { completedCount: number }) {
   return (
-    <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-6">
+    <section aria-label="Movie night progress" className="mb-6 flex snap-x gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-6 lg:overflow-visible lg:pb-0">
       {progressSteps.map((step, index) => {
         const Icon = step.icon;
         const isDone = index < completedCount;
@@ -1097,7 +1100,7 @@ function ProgressStrip({ completedCount }: { completedCount: number }) {
         return (
           <div
             key={step.label}
-            className={`rounded-lg border p-4 transition ${
+            className={`min-w-40 snap-start rounded-lg border p-4 transition lg:min-w-0 ${
               isDone
                 ? "border-green-400/30 bg-green-500/10 text-green-100"
                 : isCurrent
@@ -1130,7 +1133,7 @@ function Metric({ label, value, tone = "default" }: { label: string; value: stri
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
       <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`mt-1 truncate text-sm font-semibold ${toneClasses[tone]}`}>{value}</p>
+      <p className={`mt-1 break-words text-sm font-semibold ${toneClasses[tone]}`}>{value}</p>
     </div>
   );
 }
@@ -1153,7 +1156,7 @@ function MovieGrid({
   }
 
   return (
-    <div className={compact ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-4" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-3"}>
+    <div className={compact ? "grid grid-cols-2 gap-3 xl:grid-cols-4" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-3"}>
       {movies.map((movie) => {
         const image = posterUrl(movie);
         const activeMovie = selectedMovie?.provider === movie.provider && selectedMovie?.externalId === movie.externalId;
@@ -1418,7 +1421,7 @@ function NativeSelect({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="h-9 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm text-white outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="h-11 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-base text-white outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:h-9 md:text-sm"
     >
       {options.map((option) => (
         <option key={option} value={option}>
@@ -1566,7 +1569,7 @@ function GracenoteImportPanel({
             </div>
 
             {visibleShowtimes.length ? (
-              <div className="max-h-[34rem] space-y-4 overflow-y-auto pr-1">
+              <div className="space-y-4 md:max-h-[34rem] md:overflow-y-auto md:pr-1">
                 {groupedShowtimes.map((group) => (
                   <TheaterShowtimeSection key={group.key} group={group}>
                     <div className="grid gap-2 md:grid-cols-2">
@@ -1669,7 +1672,7 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-9 rounded border px-3 py-1.5 text-sm transition ${
+      className={`min-h-11 rounded border px-3 py-1.5 text-sm transition md:min-h-9 ${
         isActive
           ? "border-cyan-300/60 bg-cyan-400/15 text-cyan-50"
           : "border-white/10 bg-white/5 text-slate-300 hover:border-white/25 hover:bg-white/10"

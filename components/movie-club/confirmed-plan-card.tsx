@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, Clock, MapPin, Ticket } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock, ExternalLink, MapPin, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ReactNode } from "react";
 import { formatDate, formatTime, showtimeDateTime } from "@/lib/movie-club-format";
@@ -25,7 +25,7 @@ export function ConfirmedPlanCard({
       </p>
       <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
         <div>
-          <h2 className="text-3xl font-semibold tracking-tight text-white">{showtime.theaterName}</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{showtime.theaterName}</h2>
           {showtime.theaterLocation ? (
             <p className="mt-2 flex items-center gap-2 text-sm text-slate-300">
               <MapPin className="size-4 text-cyan-200" />
@@ -38,7 +38,15 @@ export function ConfirmedPlanCard({
             <PlanStat icon={<Ticket className="size-5 text-green-300" />} label="Format" value={showtime.screenFormat || "Standard"} />
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-3">
+        <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:flex-wrap md:justify-end">
+          {showtime.ticketURI ? (
+            <Button asChild className="w-full bg-green-500 text-slate-950 hover:bg-green-400 md:w-auto">
+              <a href={showtime.ticketURI} target="_blank" rel="noreferrer">
+                <ExternalLink className="size-4" />
+                Buy tickets
+              </a>
+            </Button>
+          ) : null}
           {secondaryAction}
           {onPrimaryAction ? <Button onClick={onPrimaryAction} className="bg-green-500 text-slate-950 hover:bg-green-400">RSVP and ticket</Button> : null}
         </div>

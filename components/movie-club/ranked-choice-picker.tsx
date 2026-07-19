@@ -18,6 +18,7 @@ export function RankedChoicePicker({
   disabled,
   isSaving,
   hasSavedVote,
+  hideMobileSave = false,
   onChange,
   onSave,
 }: {
@@ -26,6 +27,7 @@ export function RankedChoicePicker({
   disabled: boolean;
   isSaving: boolean;
   hasSavedVote: boolean;
+  hideMobileSave?: boolean;
   onChange: (rankIndex: number, showtimeId: string) => void;
   onSave: () => void;
 }) {
@@ -73,7 +75,7 @@ export function RankedChoicePicker({
           ))}
         </ol>
       ) : null}
-      <Button className="w-full bg-violet-500 text-white hover:bg-violet-600" disabled={disabled || !selectedCount || isSaving} onClick={onSave}>
+      <Button className={`${hideMobileSave ? "hidden md:flex" : ""} w-full bg-violet-500 text-white hover:bg-violet-600`} disabled={disabled || !selectedCount || isSaving} onClick={onSave}>
         {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}
         {hasSavedVote ? "Update ranked vote" : "Save ranked vote"}
       </Button>

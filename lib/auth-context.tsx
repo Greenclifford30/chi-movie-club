@@ -12,6 +12,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 type AuthState = {
   email: string | null;
   token: string | null;
+  identityProvider: "google" | "cognito" | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -31,6 +32,7 @@ type StoredAuthSession = {
   email: string;
   token: string;
   source?: "srp" | "hosted-ui";
+  identityProvider?: "google" | "cognito";
   refreshToken?: string;
   expiresAt?: number;
 };
@@ -214,6 +216,7 @@ async function refreshHostedUiSession(refreshToken: string) {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [email, setEmail] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [identityProvider, setIdentityProvider] = useState<"google" | "cognito" | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -232,6 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: nextEmail,
             token: nextToken,
             source: "hosted-ui",
+            identityProvider: saved.identityProvider || "google",
             refreshToken: nextRefreshToken,
             expiresAt: expiresAtFromToken(nextToken, refreshed?.expires_in),
           };
@@ -239,6 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!cancelled) {
             setEmail(nextEmail);
             setToken(nextToken);
+            setIdentityProvider(nextSession.identityProvider || "google");
             saveSession(nextSession);
           }
           return;
@@ -259,12 +264,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!cancelled) {
           setEmail(nextEmail);
           setToken(nextToken);
-          saveSession({ email: nextEmail, token: nextToken, source: "srp" });
+          setIdentityProvider("cognito");
+          saveSession({ email: nextEmail, token: nextToken, source: "srp", identityProvider: "cognito" });
         }
       } catch {
         if (!cancelled) {
           setEmail(null);
           setToken(null);
+          setIdentityProvider(null);
           window.localStorage.removeItem(storageKey);
         }
       } finally {
@@ -307,7 +314,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const sessionEmail = emailFromSession(session, username);
     setEmail(sessionEmail);
     setToken(nextToken);
-    saveSession({ email: sessionEmail, token: nextToken, source: "srp" });
+    setIdentityProvider("cognito");
+    saveSession({ email: sessionEmail, token: nextToken, source: "srp", identityProvider: "cognito" });
   }, []);
 
   const signInWithGoogle = useCallback(async (redirect?: string) => {
@@ -363,12 +371,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: nextEmail,
       token: nextToken,
       source: "hosted-ui",
+      identityProvider: "google",
       refreshToken: data.refresh_token,
       expiresAt: expiresAtFromToken(nextToken, data.expires_in),
     };
 
     setEmail(nextEmail);
     setToken(nextToken);
+    setIdentityProvider("google");
     saveSession(nextSession);
     window.sessionStorage.removeItem(hostedUiRequestKey);
     return safeRedirect(request.redirect);
@@ -424,6 +434,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setEmail(null);
     setToken(null);
+    setIdentityProvider(null);
     window.localStorage.removeItem(storageKey);
     window.sessionStorage.removeItem(hostedUiRequestKey);
   }, []);
@@ -432,6 +443,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       email,
       token,
+      identityProvider,
       isLoading,
       isAuthenticated: Boolean(token),
       signIn,
@@ -441,7 +453,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       confirmSignUp,
       signOut,
     }),
-    [email, token, isLoading, signIn, signInWithGoogle, completeHostedUiSignIn, signUp, confirmSignUp, signOut]
+    [email, token, identityProvider, isLoading, signIn, signInWithGoogle, completeHostedUiSignIn, signUp, confirmSignUp, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

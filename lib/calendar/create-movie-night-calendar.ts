@@ -1,8 +1,8 @@
 import "server-only";
 
+import { createMovieNightCalendarEvent } from "@/lib/calendar/movie-night-calendar-event";
 import type { MovieNight, Showtime } from "@/lib/movie-club-types";
 
-const FALLBACK_RUNTIME_MINUTES = 120;
 const encoder = new TextEncoder();
 
 export type MovieNightCalendarInput = {
@@ -68,33 +68,14 @@ function safeFilename(title: string) {
 }
 
 export function createMovieNightCalendar(input: MovieNightCalendarInput): MovieNightCalendar {
-  const { movieNight, showtime } = input;
+  const { movieNight } = input;
   const title = movieNight.movie.title?.trim();
   if (!title) throw new Error("Movie title is missing.");
-
-  const start = new Date(showtime.startsAtUtc);
-  if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(showtime.startsAtUtc) || Number.isNaN(start.getTime())) {
-    throw new Error("Confirmed showtime timestamp is invalid.");
-  }
-
-  const runtime = movieNight.movie.runtime;
-  const hasRuntime = typeof runtime === "number" && Number.isFinite(runtime) && runtime > 0;
-  const duration = hasRuntime ? runtime : FALLBACK_RUNTIME_MINUTES;
-  const end = new Date(start.getTime() + duration * 60_000);
-  const format = showtime.screenFormat?.trim();
-  const location = [showtime.theaterName, showtime.theaterAddress || showtime.theaterLocation]
-    .filter(Boolean)
-    .join(", ");
-  const description = [
-    "Confirmed through Movie Club.",
-    !hasRuntime ? "End time estimated using a 120-minute runtime because movie runtime metadata was unavailable." : "",
-    `View Movie Night: ${input.url}`,
-  ].filter(Boolean).join("\n");
+  const event = createMovieNightCalendarEvent(input);
   const stampSource = movieNight.updatedAt || movieNight.confirmedAt;
   const stamp = stampSource && !Number.isNaN(new Date(stampSource).getTime())
     ? new Date(stampSource)
     : input.now || new Date();
-  const summary = format ? `${title} — ${format}` : title;
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -104,15 +85,15 @@ export function createMovieNightCalendar(input: MovieNightCalendarInput): MovieN
     "BEGIN:VEVENT",
     `UID:${escapeText(`movie-night-${movieNight.movieNightId}@movieclub`)}`,
     `DTSTAMP:${utcTimestamp(stamp.toISOString(), "DTSTAMP")}`,
-    `DTSTART:${utcTimestamp(showtime.startsAtUtc, "DTSTART")}`,
-    `DTEND:${utcTimestamp(end.toISOString(), "DTEND")}`,
+    `DTSTART:${utcTimestamp(event.start.toISOString(), "DTSTART")}`,
+    `DTEND:${utcTimestamp(event.end.toISOString(), "DTEND")}`,
     `SEQUENCE:${typeof movieNight.calendarSequence === "number" && Number.isInteger(movieNight.calendarSequence) && movieNight.calendarSequence >= 0 ? movieNight.calendarSequence : 0}`,
     "STATUS:CONFIRMED",
     "TRANSP:OPAQUE",
-    `SUMMARY:${escapeText(summary)}`,
-    `LOCATION:${escapeText(location)}`,
-    `DESCRIPTION:${escapeText(description)}`,
-    `URL:${escapeText(input.url)}`,
+    `SUMMARY:${escapeText(event.summary)}`,
+    `LOCATION:${escapeText(event.location)}`,
+    `DESCRIPTION:${escapeText(event.description)}`,
+    `URL:${escapeText(event.url)}`,
     "END:VEVENT",
     "END:VCALENDAR",
   ];

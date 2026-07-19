@@ -39,13 +39,13 @@ export default function ClubHistoryPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <section className="mb-8 border-b border-white/10 pb-6">
           <p className="mb-2 flex items-center gap-2 text-sm text-cyan-300">
             <CalendarDays className="size-4" />
             Club history
           </p>
-          <h1 className="text-4xl font-semibold tracking-tight text-white">Past movie nights</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Past movie nights</h1>
           <p className="mt-2 max-w-2xl text-slate-400">
             Completed and confirmed events stay attached to the club for later reference.
           </p>
@@ -66,7 +66,7 @@ export default function ClubHistoryPage() {
               const image = posterUrl(night.movie);
               return (
                 <article key={night.movieNightId} className="overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 shadow-2xl shadow-black/20">
-                  <div className="relative h-72 bg-slate-950">
+                  <div className="relative h-56 bg-slate-950 sm:h-72">
                     {image ? (
                       <Image src={image} alt={night.movie.title} fill sizes="360px" className="object-cover" />
                     ) : (

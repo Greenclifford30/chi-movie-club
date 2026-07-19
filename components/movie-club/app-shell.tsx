@@ -1,6 +1,6 @@
 "use client";
 
-import { Film, Loader2, LogOut, Settings } from "lucide-react";
+import { CalendarDays, Film, History, Loader2, LogOut, Settings, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -47,9 +47,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ]
     : [];
 
+  const mobileLinks = clubId
+    ? [
+        { href: "/clubs", label: "Clubs", icon: Film },
+        { href: `/clubs/${clubId}`, label: "Active", icon: CalendarDays },
+        { href: `/clubs/${clubId}/history`, label: "History", icon: History },
+        { href: `/clubs/${clubId}/admin`, label: "Admin", icon: ShieldCheck },
+      ]
+    : [];
+
   return (
     <ProtectedPage>
-      <main className="min-h-screen text-slate-50">
+      <main className={`min-h-dvh text-slate-50 ${clubId ? "pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0" : ""}`}>
         <header className="sticky top-0 z-50 border-b border-white/10 bg-[#111827]/90 backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-6">
@@ -90,11 +99,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
               >
                 <LogOut className="size-4" />
+                <span className="sr-only">Sign out</span>
               </Button>
             </div>
           </div>
         </header>
         {children}
+        {mobileLinks.length ? (
+          <nav
+            aria-label="Club navigation"
+            className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#111827]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+          >
+            <div className="mx-auto grid h-[4.5rem] max-w-lg grid-cols-4 px-2">
+              {mobileLinks.map((link) => {
+                const active = pathname === link.href;
+                const Icon = link.icon;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-lg text-xs font-medium transition ${
+                      active ? "text-cyan-200" : "text-slate-400 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <Icon className="size-5" />
+                    <span>{link.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        ) : null}
       </main>
     </ProtectedPage>
   );

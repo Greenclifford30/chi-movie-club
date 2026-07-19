@@ -79,14 +79,14 @@ export default function ClubsPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <section className="mb-8 flex flex-col gap-6 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-2 flex items-center gap-2 text-sm text-cyan-300">
               <Users className="size-4" />
               Your clubs
             </p>
-            <h1 className="text-4xl font-semibold tracking-tight text-white">Choose a movie club</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Choose a movie club</h1>
             <p className="mt-2 max-w-2xl text-slate-400">
               Clubs are loaded from your signed-in membership records.
             </p>

@@ -77,10 +77,10 @@ export default function SettingsPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-6">
           <div className="mb-2 flex items-center gap-2 text-sm text-cyan-300"><Settings className="size-4" />Account settings</div>
-          <h1 className="text-3xl font-semibold text-white">Planning defaults</h1>
+          <h1 className="text-2xl font-semibold text-white sm:text-3xl">Planning defaults</h1>
           <p className="mt-2 text-slate-300">Set reusable starting values for every club you administer.</p>
         </div>
         {error ? <StatusAlert tone="danger" className="mb-4">{error}</StatusAlert> : null}
@@ -103,7 +103,7 @@ export default function SettingsPage() {
                 onPreferredFormatsChange={(preferredFormats) => setPreferences((current) => ({ ...current, preferredFormats }))}
               />
             )}
-            <Button onClick={handleSave} disabled={isLoading || isSaving} className="bg-violet-500 text-white hover:bg-violet-600">
+            <Button onClick={handleSave} disabled={isLoading || isSaving} className="w-full bg-violet-500 text-white hover:bg-violet-600 sm:w-auto">
               {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Save defaults
             </Button>
           </CardContent>

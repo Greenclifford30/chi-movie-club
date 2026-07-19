@@ -23,7 +23,7 @@ export function StatusAlert({
   const Icon = tone === "success" ? CheckCircle2 : tone === "danger" || tone === "warning" ? AlertTriangle : Info;
 
   return (
-    <div className={`rounded-lg border p-3 text-sm ${toneClasses[tone]} ${className}`}>
+    <div role={tone === "danger" ? "alert" : "status"} className={`rounded-lg border p-3 text-sm ${toneClasses[tone]} ${className}`}>
       <div className="flex items-start gap-2">
         <Icon className="mt-0.5 size-4 shrink-0" />
         <div className="min-w-0">{children}</div>
