@@ -1,13 +1,15 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={<CallbackShell message="Completing sign-in..." />}>
+    <Suspense fallback={<CallbackShell message="Completing Google sign-in..." />}>
       <AuthCallbackContent />
     </Suspense>
   );
@@ -16,59 +18,75 @@ export default function AuthCallbackPage() {
 function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { completeGoogleSignIn } = useAuth();
+  const { completeHostedUiSignIn } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const hasCompleted = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    if (hasCompleted.current) {
+      return;
+    }
+    hasCompleted.current = true;
 
     async function completeSignIn() {
-      const oauthError = searchParams.get("error_description") || searchParams.get("error");
-      const code = searchParams.get("code");
-      const state = searchParams.get("state");
-
-      if (oauthError) {
-        setError(oauthError);
+      const providerError = searchParams.get("error_description") || searchParams.get("error");
+      if (providerError) {
+        setError(providerError);
         return;
       }
 
+      const code = searchParams.get("code");
+      const state = searchParams.get("state");
       if (!code || !state) {
-        setError("Google sign-in returned without the required authorization code.");
+        setError("Google sign-in did not return the expected authorization code.");
         return;
       }
 
       try {
-        const redirectPath = await completeGoogleSignIn(code, state);
-        if (!cancelled) {
-          router.replace(redirectPath);
-        }
+        const redirect = await completeHostedUiSignIn(code, state);
+        router.replace(redirect);
       } catch (callbackError) {
-        if (!cancelled) {
-          setError(callbackError instanceof Error ? callbackError.message : "Unable to complete Google sign-in.");
-        }
+        setError(callbackError instanceof Error ? callbackError.message : "Unable to complete Google sign-in.");
       }
     }
 
     completeSignIn();
-    return () => {
-      cancelled = true;
-    };
-  }, [completeGoogleSignIn, router, searchParams]);
+  }, [completeHostedUiSignIn, router, searchParams]);
 
   if (error) {
-    return <CallbackShell message={error} isError />;
+    return (
+      <CallbackShell message="Google sign-in failed">
+        <div className="mt-4 rounded-lg border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-100">
+          <div className="flex gap-3">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            <p>{error}</p>
+          </div>
+        </div>
+        <Button asChild className="mt-5 w-full bg-violet-500 text-white hover:bg-violet-600">
+          <Link href="/sign-in">Back to sign in</Link>
+        </Button>
+      </CallbackShell>
+    );
   }
 
-  return <CallbackShell message="Completing sign-in..." />;
+  return <CallbackShell message="Completing Google sign-in..." />;
 }
 
-function CallbackShell({ message, isError = false }: { message: string; isError?: boolean }) {
+function CallbackShell({ children, message }: { children?: React.ReactNode; message: string }) {
+  const hasError = Boolean(children);
+
   return (
     <main className="grid min-h-screen place-items-center px-4 text-slate-50">
-      <div className="w-full max-w-sm rounded-lg border border-white/10 bg-slate-900/80 p-6 text-center shadow-2xl shadow-black/40">
-        {isError ? null : <Loader2 className="mx-auto mb-4 size-6 animate-spin text-cyan-300" />}
-        <p className={isError ? "text-sm text-rose-100" : "text-sm text-slate-300"}>{message}</p>
-      </div>
+      <section className="w-full max-w-md rounded-lg border border-white/10 bg-slate-900/85 p-8 shadow-2xl shadow-black/40">
+        <div className="flex items-center gap-3">
+          {hasError ? <AlertCircle className="size-5 text-rose-200" /> : <Loader2 className="size-5 animate-spin text-cyan-300" />}
+          <div>
+            <p className="text-sm text-slate-400">Movie Club</p>
+            <h1 className="text-xl font-semibold text-white">{message}</h1>
+          </div>
+        </div>
+        {children}
+      </section>
     </main>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Film, Loader2, LogOut } from "lucide-react";
+import { CalendarDays, Film, History, Loader2, LogOut, Settings, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -47,6 +47,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ]
     : [];
 
+  const mobileLinks = clubId
+    ? [
+        { href: "/clubs", label: "Clubs", icon: Film },
+        { href: `/clubs/${clubId}`, label: "Active", icon: CalendarDays },
+        { href: `/clubs/${clubId}/history`, label: "History", icon: History },
+        { href: `/clubs/${clubId}/admin`, label: "Admin", icon: ShieldCheck },
+      ]
+    : [];
+
   return (
     <ProtectedPage>
       <a
@@ -80,6 +89,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />
+              <Button asChild variant="ghost" size="icon" title="Account settings">
+                <Link href="/settings">
+                  <Settings className="size-4" />
+                  <span className="sr-only">Account settings</span>
+                </Link>
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -90,24 +105,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
               >
                 <LogOut className="size-4" />
+                <span className="sr-only">Sign out</span>
               </Button>
             </div>
           </div>
         </header>
         {children}
-        {links.length ? (
-          <nav aria-label="Club navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-slate-950/95 px-3 py-2 backdrop-blur-xl md:hidden">
-            <div className="mx-auto grid max-w-md grid-cols-3 gap-1">
-              {links.map((link) => {
+        {mobileLinks.length ? (
+          <nav
+            aria-label="Club navigation"
+            className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#111827]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+          >
+            <div className="mx-auto grid h-[4.5rem] max-w-lg grid-cols-4 px-2">
+              {mobileLinks.map((link) => {
                 const active = pathname === link.href;
+                const Icon = link.icon;
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
                     aria-current={active ? "page" : undefined}
-                    className={active ? "rounded-md bg-white/10 px-2 py-2 text-center text-xs font-semibold text-white" : "rounded-md px-2 py-2 text-center text-xs text-slate-400 transition hover:bg-white/5 hover:text-white"}
+                    className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-lg text-xs font-medium transition ${
+                      active ? "text-cyan-200" : "text-slate-400 hover:bg-white/5 hover:text-white"
+                    }`}
                   >
-                    {link.label}
+                    <Icon className="size-5" />
+                    <span>{link.label}</span>
                   </Link>
                 );
               })}

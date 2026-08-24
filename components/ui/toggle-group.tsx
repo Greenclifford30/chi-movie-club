@@ -61,13 +61,14 @@ const ToggleGroupItem = React.forwardRef<HTMLButtonElement, ToggleGroupItemProps
       <button
         ref={ref}
         type="button"
+        aria-pressed={isSelected}
         onClick={handleClick}
         disabled={disabled}
         className={cn(
           "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           "border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground",
-          "h-9 px-3",
+          "h-11 px-3 md:h-9",
           isSelected && "bg-primary text-primary-foreground border-primary",
           disabled && "pointer-events-none opacity-50",
           className

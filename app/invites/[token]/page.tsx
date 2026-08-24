@@ -86,8 +86,8 @@ export default function InvitePage() {
   );
 
   return (
-    <main className="grid min-h-screen place-items-center px-4 py-10 text-slate-50">
-      <section className="w-full max-w-2xl rounded-lg border border-white/10 bg-slate-900/85 p-8 shadow-2xl shadow-black/40">
+    <main className="grid min-h-dvh place-items-center px-4 py-4 text-slate-50 sm:py-10">
+      <section className="w-full max-w-2xl rounded-lg border border-white/10 bg-slate-900/85 p-5 shadow-2xl shadow-black/40 sm:p-8">
         <div className="mb-8 flex items-center gap-2 font-semibold text-white">
           <Film className="size-6" />
           <span>Movie Club</span>

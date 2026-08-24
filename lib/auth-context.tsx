@@ -12,11 +12,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 type AuthState = {
   email: string | null;
   token: string | null;
+  identityProvider: "google" | "cognito" | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: (redirectPath?: string) => Promise<void>;
-  completeGoogleSignIn: (code: string, state: string) => Promise<string>;
+  signInWithGoogle: (redirect?: string) => Promise<void>;
+  completeHostedUiSignIn: (code: string, state: string) => Promise<string>;
   signUp: (email: string, password: string) => Promise<void>;
   confirmSignUp: (email: string, code: string) => Promise<void>;
   signOut: () => void;
@@ -25,21 +26,29 @@ type AuthState = {
 const AuthContext = createContext<AuthState | null>(null);
 
 const storageKey = "movie-club-auth";
-const oauthStateKey = "movie-club-oauth-state";
-const defaultOauthScopes = "openid email profile";
+const hostedUiRequestKey = "movie-club-hosted-ui-request";
 
-type StoredAuth = {
-  email?: string;
-  token?: string;
+type StoredAuthSession = {
+  email: string;
+  token: string;
+  source?: "srp" | "hosted-ui";
+  identityProvider?: "google" | "cognito";
   refreshToken?: string;
   expiresAt?: number;
-  provider?: "cognito" | "oauth";
 };
 
-type OauthState = {
+type HostedUiRequest = {
+  codeVerifier: string;
+  redirect: string;
   state: string;
-  verifier: string;
-  redirectPath: string;
+};
+
+type HostedUiTokenResponse = {
+  id_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  error?: string;
+  error_description?: string;
 };
 
 function getPool() {
@@ -56,23 +65,28 @@ function getPool() {
   });
 }
 
-function tokenFromSession(session: CognitoUserSession) {
-  return session.getIdToken().getJwtToken();
+function getClientId() {
+  const clientId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID;
+  if (!clientId) {
+    throw new Error("Cognito app client configuration is missing.");
+  }
+  return clientId;
 }
 
-function decodeJwtPayload(token: string) {
-  const [, payload] = token.split(".");
-  if (!payload) {
-    return {};
+function getHostedUiDomain() {
+  const domain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN;
+  if (!domain) {
+    throw new Error("Cognito Hosted UI domain is missing. Set NEXT_PUBLIC_COGNITO_DOMAIN.");
   }
+  return domain.replace(/\/+$/, "");
+}
 
-  try {
-    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, "=");
-    return JSON.parse(atob(paddedPayload)) as { email?: unknown; exp?: unknown };
-  } catch {
-    return {};
-  }
+function getCallbackUrl() {
+  return `${window.location.origin}/auth/callback`;
+}
+
+function tokenFromSession(session: CognitoUserSession) {
+  return session.getIdToken().getJwtToken();
 }
 
 function emailFromSession(session: CognitoUserSession, fallbackEmail: string) {
@@ -80,103 +94,34 @@ function emailFromSession(session: CognitoUserSession, fallbackEmail: string) {
   return typeof payload.email === "string" && payload.email ? payload.email : fallbackEmail;
 }
 
-function emailFromToken(token: string, fallbackEmail = "") {
+function decodeJwtPayload(token: string) {
+  const [, payload] = token.split(".");
+  if (!payload) {
+    throw new Error("Cognito returned an invalid ID token.");
+  }
+
+  const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  const decoded = window.atob(padded);
+  const bytes = Uint8Array.from(decoded, (char) => char.charCodeAt(0));
+  const json = new TextDecoder().decode(bytes);
+  return JSON.parse(json) as { email?: unknown; exp?: unknown };
+}
+
+function emailFromToken(token: string) {
   const payload = decodeJwtPayload(token);
-  return typeof payload.email === "string" && payload.email ? payload.email : fallbackEmail;
+  if (typeof payload.email !== "string" || !payload.email) {
+    throw new Error("Cognito ID token did not include an email address.");
+  }
+  return payload.email;
 }
 
-function expiresAtFromToken(token: string) {
+function expiresAtFromToken(token: string, fallbackSeconds?: number) {
   const payload = decodeJwtPayload(token);
-  return typeof payload.exp === "number" ? payload.exp * 1000 : Date.now() + 60 * 60 * 1000;
-}
-
-function safeRedirect(value: string | undefined) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/clubs";
+  if (typeof payload.exp === "number") {
+    return payload.exp * 1000;
   }
-  return value;
-}
-
-function getOauthDomain() {
-  const domain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN?.trim();
-  if (!domain) {
-    throw new Error("Cognito OAuth domain is missing. Set NEXT_PUBLIC_COGNITO_DOMAIN.");
-  }
-
-  return domain.startsWith("https://") ? domain.replace(/\/$/, "") : `https://${domain.replace(/\/$/, "")}`;
-}
-
-function getOauthRedirectUri() {
-  if (typeof window === "undefined") {
-    throw new Error("Google sign-in is only available in the browser.");
-  }
-
-  return process.env.NEXT_PUBLIC_COGNITO_REDIRECT_URI || `${window.location.origin}/auth/callback`;
-}
-
-function getOauthScopes() {
-  return process.env.NEXT_PUBLIC_COGNITO_OAUTH_SCOPES || defaultOauthScopes;
-}
-
-function getOauthClientId() {
-  const clientId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID;
-  if (!clientId) {
-    throw new Error("Cognito user pool client ID is missing.");
-  }
-  return clientId;
-}
-
-function randomBase64Url(byteLength: number) {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  return base64UrlEncode(bytes);
-}
-
-function base64UrlEncode(bytes: Uint8Array) {
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-async function sha256Base64Url(value: string) {
-  const bytes = new TextEncoder().encode(value);
-  const hash = await crypto.subtle.digest("SHA-256", bytes);
-  return base64UrlEncode(new Uint8Array(hash));
-}
-
-function readStoredAuth() {
-  try {
-    const saved = window.localStorage.getItem(storageKey);
-    return saved ? (JSON.parse(saved) as StoredAuth) : null;
-  } catch {
-    return null;
-  }
-}
-
-function storeAuth(nextAuth: StoredAuth) {
-  window.localStorage.setItem(storageKey, JSON.stringify(nextAuth));
-}
-
-async function refreshOauthSession(refreshToken: string) {
-  const response = await fetch(`${getOauthDomain()}/oauth2/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: getOauthClientId(),
-      refresh_token: refreshToken,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Saved Google session could not be refreshed.");
-  }
-
-  return (await response.json()) as { id_token?: string; refresh_token?: string };
+  return Date.now() + (fallbackSeconds || 3600) * 1000;
 }
 
 function currentSession(user: CognitoUser) {
@@ -203,9 +148,75 @@ function refreshSession(user: CognitoUser, session: CognitoUserSession) {
   });
 }
 
+function safeRedirect(value: string | null | undefined) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/clubs";
+  }
+  return value;
+}
+
+function saveSession(nextSession: StoredAuthSession) {
+  window.localStorage.setItem(storageKey, JSON.stringify(nextSession));
+}
+
+function readSavedSession() {
+  const saved = window.localStorage.getItem(storageKey);
+  if (!saved) {
+    return null;
+  }
+  return JSON.parse(saved) as StoredAuthSession;
+}
+
+function randomUrlSafeString(length = 32) {
+  const bytes = new Uint8Array(length);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function base64UrlEncode(bytes: ArrayBuffer) {
+  const binary = String.fromCharCode(...new Uint8Array(bytes));
+  return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function createCodeChallenge(codeVerifier: string) {
+  const bytes = new TextEncoder().encode(codeVerifier);
+  const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+  return base64UrlEncode(digest);
+}
+
+async function exchangeHostedUiTokens(body: URLSearchParams) {
+  const response = await fetch(`${getHostedUiDomain()}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  const data = (await response.json()) as HostedUiTokenResponse;
+  if (!response.ok || data.error) {
+    throw new Error(data.error_description || data.error || "Unable to complete Google sign-in.");
+  }
+  if (!data.id_token) {
+    throw new Error("Cognito did not return an ID token.");
+  }
+  return data;
+}
+
+async function refreshHostedUiSession(refreshToken: string) {
+  return exchangeHostedUiTokens(
+    new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: getClientId(),
+      refresh_token: refreshToken,
+    })
+  );
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [email, setEmail] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [identityProvider, setIdentityProvider] = useState<"google" | "cognito" | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -213,25 +224,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function restoreSession() {
       try {
-        const savedAuth = readStoredAuth();
-        if (savedAuth?.provider === "oauth" && savedAuth.token) {
-          const shouldRefresh = Boolean(savedAuth.refreshToken && (!savedAuth.expiresAt || savedAuth.expiresAt < Date.now() + 60_000));
-          const refreshed = shouldRefresh && savedAuth.refreshToken ? await refreshOauthSession(savedAuth.refreshToken) : null;
-          const nextToken = refreshed?.id_token || savedAuth.token;
-          const nextEmail = emailFromToken(nextToken, savedAuth.email || "");
-          const nextRefreshToken = refreshed?.refresh_token || savedAuth.refreshToken;
-          const nextAuth = {
+        const saved = readSavedSession();
+        if (saved?.source === "hosted-ui" && saved.refreshToken) {
+          const needsRefresh = !saved.expiresAt || saved.expiresAt - Date.now() < 60_000;
+          const refreshed = needsRefresh ? await refreshHostedUiSession(saved.refreshToken) : null;
+          const nextToken = refreshed?.id_token || saved.token;
+          const nextRefreshToken = refreshed?.refresh_token || saved.refreshToken;
+          const nextEmail = emailFromToken(nextToken);
+          const nextSession: StoredAuthSession = {
             email: nextEmail,
             token: nextToken,
+            source: "hosted-ui",
+            identityProvider: saved.identityProvider || "google",
             refreshToken: nextRefreshToken,
-            expiresAt: expiresAtFromToken(nextToken),
-            provider: "oauth" as const,
+            expiresAt: expiresAtFromToken(nextToken, refreshed?.expires_in),
           };
 
           if (!cancelled) {
             setEmail(nextEmail);
             setToken(nextToken);
-            storeAuth(nextAuth);
+            setIdentityProvider(nextSession.identityProvider || "google");
+            saveSession(nextSession);
           }
           return;
         }
@@ -246,17 +259,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const cachedSession = await currentSession(user);
         const session = await refreshSession(user, cachedSession).catch(() => cachedSession);
         const nextToken = tokenFromSession(session);
-        const nextEmail = emailFromSession(session, savedAuth?.email || user.getUsername());
+        const nextEmail = emailFromSession(session, saved?.email || user.getUsername());
 
         if (!cancelled) {
           setEmail(nextEmail);
           setToken(nextToken);
-          storeAuth({ email: nextEmail, token: nextToken, provider: "cognito" });
+          setIdentityProvider("cognito");
+          saveSession({ email: nextEmail, token: nextToken, source: "srp", identityProvider: "cognito" });
         }
       } catch {
         if (!cancelled) {
           setEmail(null);
           setToken(null);
+          setIdentityProvider(null);
           window.localStorage.removeItem(storageKey);
         }
       } finally {
@@ -299,83 +314,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const sessionEmail = emailFromSession(session, username);
     setEmail(sessionEmail);
     setToken(nextToken);
-    storeAuth({ email: sessionEmail, token: nextToken, provider: "cognito" });
+    setIdentityProvider("cognito");
+    saveSession({ email: sessionEmail, token: nextToken, source: "srp", identityProvider: "cognito" });
   }, []);
 
-  const signInWithGoogle = useCallback(async (redirectPath?: string) => {
-    const state = randomBase64Url(24);
-    const verifier = randomBase64Url(64);
-    const challenge = await sha256Base64Url(verifier);
-    const oauthState: OauthState = {
+  const signInWithGoogle = useCallback(async (redirect?: string) => {
+    const state = randomUrlSafeString();
+    const codeVerifier = randomUrlSafeString(64);
+    const codeChallenge = await createCodeChallenge(codeVerifier);
+    const nextRedirect = safeRedirect(redirect);
+    const request: HostedUiRequest = {
+      codeVerifier,
+      redirect: nextRedirect,
       state,
-      verifier,
-      redirectPath: safeRedirect(redirectPath),
     };
 
-    window.sessionStorage.setItem(oauthStateKey, JSON.stringify(oauthState));
+    window.sessionStorage.setItem(hostedUiRequestKey, JSON.stringify(request));
 
-    const authorizationUrl = new URL(`${getOauthDomain()}/oauth2/authorize`);
-    authorizationUrl.searchParams.set("response_type", "code");
-    authorizationUrl.searchParams.set("client_id", getOauthClientId());
-    authorizationUrl.searchParams.set("redirect_uri", getOauthRedirectUri());
-    authorizationUrl.searchParams.set("scope", getOauthScopes());
-    authorizationUrl.searchParams.set("identity_provider", "Google");
-    authorizationUrl.searchParams.set("code_challenge", challenge);
-    authorizationUrl.searchParams.set("code_challenge_method", "S256");
-    authorizationUrl.searchParams.set("state", state);
-
-    window.location.assign(authorizationUrl.toString());
-  }, []);
-
-  const completeGoogleSignIn = useCallback(async (code: string, state: string) => {
-    const savedState = window.sessionStorage.getItem(oauthStateKey);
-    if (!savedState) {
-      throw new Error("Google sign-in session was not found. Please try again.");
-    }
-
-    const oauthState = JSON.parse(savedState) as OauthState;
-    if (oauthState.state !== state) {
-      throw new Error("Google sign-in state did not match. Please try again.");
-    }
-
-    const response = await fetch(`${getOauthDomain()}/oauth2/token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: getOauthClientId(),
-        redirect_uri: getOauthRedirectUri(),
-        code,
-        code_verifier: oauthState.verifier,
-      }),
+    const params = new URLSearchParams({
+      client_id: getClientId(),
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+      identity_provider: "Google",
+      redirect_uri: getCallbackUrl(),
+      response_type: "code",
+      scope: "openid email profile",
+      state,
     });
 
-    if (!response.ok) {
-      throw new Error("Google sign-in could not be completed.");
+    window.location.assign(`${getHostedUiDomain()}/oauth2/authorize?${params}`);
+  }, []);
+
+  const completeHostedUiSignIn = useCallback(async (code: string, state: string) => {
+    const savedRequest = window.sessionStorage.getItem(hostedUiRequestKey);
+    if (!savedRequest) {
+      throw new Error("Google sign-in request was not found. Please start sign-in again.");
     }
 
-    const result = (await response.json()) as { id_token?: string; refresh_token?: string };
-    if (!result.id_token) {
-      throw new Error("Google sign-in did not return an ID token.");
+    const request = JSON.parse(savedRequest) as HostedUiRequest;
+    if (request.state !== state) {
+      throw new Error("Google sign-in state did not match. Please start sign-in again.");
     }
 
-    const nextEmail = emailFromToken(result.id_token);
-    const nextAuth = {
+    const data = await exchangeHostedUiTokens(
+      new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: getClientId(),
+        code,
+        code_verifier: request.codeVerifier,
+        redirect_uri: getCallbackUrl(),
+      })
+    );
+    const nextToken = data.id_token || "";
+    const nextEmail = emailFromToken(nextToken);
+    const nextSession: StoredAuthSession = {
       email: nextEmail,
-      token: result.id_token,
-      refreshToken: result.refresh_token,
-      expiresAt: expiresAtFromToken(result.id_token),
-      provider: "oauth" as const,
+      token: nextToken,
+      source: "hosted-ui",
+      identityProvider: "google",
+      refreshToken: data.refresh_token,
+      expiresAt: expiresAtFromToken(nextToken, data.expires_in),
     };
 
     setEmail(nextEmail);
-    setToken(result.id_token);
-    storeAuth(nextAuth);
-    window.sessionStorage.removeItem(oauthStateKey);
-
-    return safeRedirect(oauthState.redirectPath);
+    setToken(nextToken);
+    setIdentityProvider("google");
+    saveSession(nextSession);
+    window.sessionStorage.removeItem(hostedUiRequestKey);
+    return safeRedirect(request.redirect);
   }, []);
 
   const signUp = useCallback(async (nextEmail: string, password: string) => {
@@ -428,23 +434,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setEmail(null);
     setToken(null);
+    setIdentityProvider(null);
     window.localStorage.removeItem(storageKey);
+    window.sessionStorage.removeItem(hostedUiRequestKey);
   }, []);
 
   const value = useMemo<AuthState>(
     () => ({
       email,
       token,
+      identityProvider,
       isLoading,
       isAuthenticated: Boolean(token),
       signIn,
       signInWithGoogle,
-      completeGoogleSignIn,
+      completeHostedUiSignIn,
       signUp,
       confirmSignUp,
       signOut,
     }),
-    [email, token, isLoading, signIn, signInWithGoogle, completeGoogleSignIn, signUp, confirmSignUp, signOut]
+    [email, token, identityProvider, isLoading, signIn, signInWithGoogle, completeHostedUiSignIn, signUp, confirmSignUp, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

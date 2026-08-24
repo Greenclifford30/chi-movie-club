@@ -19,6 +19,13 @@ export interface ClubsResponse {
   isPlatformAdmin: boolean;
 }
 
+export interface UserPlanningPreferences {
+  defaultZipCode: string;
+  defaultRadiusMiles: number;
+  preferredFormats: string[];
+  updatedAt?: string;
+}
+
 export interface ClubInvite {
   clubId: string;
   clubName?: string;
@@ -45,6 +52,8 @@ export interface ClubMembership {
 }
 
 export interface MovieSnapshot {
+  externalProvider?: string;
+  externalMovieId?: string;
   provider: string;
   externalId: string;
   title: string;
@@ -57,6 +66,8 @@ export interface MovieSnapshot {
   genres?: string[] | number[];
   rating?: number | null;
   popularity?: number | null;
+  status?: "now_playing" | "coming_soon" | string;
+  metadataSnapshot?: Record<string, unknown>;
 }
 
 export interface MovieNight {
@@ -66,9 +77,26 @@ export interface MovieNight {
   movieSelectionMode?: "admin_selected" | "group_vote";
   movie: MovieSnapshot;
   targetDate?: string;
+  dateWindowStart?: string;
+  dateWindowEnd?: string;
+  zipCode?: string;
+  radiusMiles?: number;
+  timezone?: string;
+  preferredFormats?: string[];
+  preferredTheaterIds?: string[];
+  showtimeImportStatus?: "idle" | "queued" | "running" | "completed" | "failed" | string;
+  lastShowtimeImportAt?: string;
+  lastShowtimeImportSummary?: ShowtimeImportSummary;
   votingClosesAt?: string;
+  votingClosedAt?: string;
+  votingClosedBy?: string;
   confirmedShowtimeId?: string;
   confirmedShowtime?: Showtime;
+  confirmedAt?: string;
+  calendarSequence?: number;
+  confirmedBy?: string;
+  completedAt?: string;
+  completedBy?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -77,16 +105,82 @@ export interface Showtime {
   movieNightId: string;
   showtimeId: string;
   provider?: string;
+  externalShowtimeId?: string;
+  externalMovieId?: string;
+  externalTheaterId?: string;
   providerShowtimeId?: string;
   providerMovieId?: string;
   providerTheaterId?: string;
   theaterName: string;
   theaterLocation?: string;
+  theaterAddress?: string;
+  startsAt?: string;
   startsAtUtc: string;
+  localDate?: string;
+  localTime?: string;
   localDateTime?: string;
+  timezone?: string;
   screenFormat?: string;
+  amenities?: string[];
   ticketURI?: string;
   quals?: string[];
+  importJobId?: string;
+  dedupeKey?: string;
+  status?: "imported" | "approved" | "rejected";
+}
+
+export interface MovieNightPlanningInput {
+  targetDate: string;
+  dateWindowStart: string;
+  dateWindowEnd: string;
+  zipCode: string;
+  radiusMiles: number;
+  timezone?: string;
+  preferredFormats?: string[];
+  preferredTheaterIds?: string[];
+}
+
+export interface ShowtimeImportSummary {
+  resultCount?: number;
+  importedCount?: number;
+  duplicateCount?: number;
+  requestedDates?: string[];
+  errorMessage?: string;
+}
+
+export interface ShowtimeImportJob {
+  importJobId: string;
+  movieNightId: string;
+  clubId: string;
+  provider: string;
+  status: "queued" | "running" | "completed" | "failed";
+  params: {
+    movieExternalId: string;
+    zipCode: string;
+    radiusMiles: number;
+    dateWindowStart: string;
+    dateWindowEnd: string;
+  };
+  requestedDates: string[];
+  resultCount: number;
+  importedCount: number;
+  duplicateCount: number;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MovieDiscoveryResult {
+  externalProvider: string;
+  externalMovieId: string;
+  title: string;
+  overview?: string;
+  posterUrl?: string;
+  releaseDate?: string;
+  runtimeMinutes?: number;
+  genres?: string[];
+  status: "now_playing" | "coming_soon";
+  metadataSnapshot?: Record<string, unknown>;
 }
 
 export interface CachedShowtime {
@@ -138,6 +232,30 @@ export interface ActiveMovieNightResponse {
   showtimes: Showtime[];
   currentUserVote: Vote | null;
   currentUserRsvp: Rsvp | null;
+  currentUserRole?: ClubRole;
+}
+
+export interface AttendanceMember {
+  userId: string;
+  name: string;
+  email: string;
+  role: ClubRole;
+  rsvpStatus: RsvpStatus | "pending";
+  ticketStatus: TicketStatus;
+  updatedAt?: string;
+}
+
+export interface AttendanceResponse {
+  summary: {
+    totalMembers: number;
+    going: number;
+    maybe: number;
+    notGoing: number;
+    pending: number;
+    purchased: number;
+    notPurchased: number;
+  };
+  members: AttendanceMember[];
 }
 
 export interface HistoryMovieNight extends MovieNight {

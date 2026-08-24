@@ -1,6 +1,6 @@
 "use client";
 
-import { Film, Loader2, LogIn } from "lucide-react";
+import { Chrome, Film, Loader2, LogIn } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useState } from "react";
@@ -55,21 +55,38 @@ function SignInContent() {
 
     try {
       await signInWithGoogle(redirect);
-    } catch (googleError) {
-      setError(googleError instanceof Error ? googleError.message : "Unable to start Google sign-in.");
+    } catch (signInError) {
+      setError(signInError instanceof Error ? signInError.message : "Unable to start Google sign-in.");
       setIsGoogleSubmitting(false);
     }
   }
 
   return (
     <AuthShell>
-      <form onSubmit={handleSubmit} className="flex flex-col justify-center p-8">
+      <form onSubmit={handleSubmit} className="flex flex-col justify-center p-5 sm:p-8">
         <div className="mb-8">
           <p className="text-sm text-slate-400">Welcome back</p>
           <h2 className="mt-1 text-2xl font-semibold text-white">Sign in</h2>
         </div>
 
         <div className="space-y-4">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isSubmitting || isGoogleSubmitting}
+            onClick={handleGoogleSignIn}
+            className="w-full border-white/10 bg-white text-slate-950 hover:bg-slate-100 hover:text-slate-950"
+          >
+            {isGoogleSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Chrome className="size-4" />}
+            Continue with Google
+          </Button>
+
+          <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-slate-500">
+            <span className="h-px flex-1 bg-white/10" />
+            <span>Email</span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -102,24 +119,7 @@ function SignInContent() {
             </div>
           ) : null}
 
-          <Button
-            type="button"
-            variant="outline"
-            disabled={isSubmitting || isGoogleSubmitting}
-            onClick={handleGoogleSignIn}
-            className="w-full border-white/10 bg-white text-slate-950 hover:bg-slate-100"
-          >
-            {isGoogleSubmitting ? <Loader2 className="size-4 animate-spin" /> : <GoogleMark />}
-            Continue with Google
-          </Button>
-
-          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-slate-500">
-            <span className="h-px flex-1 bg-white/10" />
-            Email
-            <span className="h-px flex-1 bg-white/10" />
-          </div>
-
-          <Button type="submit" disabled={isSubmitting} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+          <Button type="submit" disabled={isSubmitting || isGoogleSubmitting} className="w-full bg-violet-500 text-white hover:bg-violet-600">
             {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
             Sign in
           </Button>
@@ -138,14 +138,14 @@ function SignInContent() {
 
 function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="grid min-h-screen place-items-center px-4 py-10 text-slate-50">
+    <main className="grid min-h-dvh place-items-center px-4 py-4 text-slate-50 sm:py-10">
       <section className="grid w-full max-w-5xl overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 shadow-2xl shadow-black/40 md:grid-cols-[1.05fr_0.95fr]">
-        <div className="flex min-h-[520px] flex-col justify-between bg-[linear-gradient(145deg,rgba(139,92,246,0.22),rgba(34,211,238,0.08))] p-8">
+        <div className="flex flex-col justify-between bg-[linear-gradient(145deg,rgba(139,92,246,0.22),rgba(34,211,238,0.08))] p-5 md:min-h-[520px] md:p-8">
           <div className="flex items-center gap-2 font-semibold">
             <Film className="size-6" />
             <span>Movie Club</span>
           </div>
-          <div>
+          <div className="hidden md:block">
             <p className="mb-3 text-sm font-medium text-cyan-200">Chicago movie nights</p>
             <h1 className="max-w-md text-4xl font-semibold tracking-tight text-white md:text-5xl">
               Plan movie nights without the group-chat chaos.
@@ -169,14 +169,6 @@ function AuthShellFallback() {
         Loading...
       </div>
     </main>
-  );
-}
-
-function GoogleMark() {
-  return (
-    <span className="grid size-4 place-items-center rounded-sm bg-white font-semibold leading-none text-[#4285f4]">
-      G
-    </span>
   );
 }
 
