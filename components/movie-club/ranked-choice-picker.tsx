@@ -46,11 +46,11 @@ export function RankedChoicePicker({
         return (
           <div key={rank.label} className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-sm font-medium text-slate-200">{rank.label}</label>
+              <span id={`rank-${index}-label`} className="text-sm font-medium text-slate-200">{rank.label}</span>
               <span className="text-xs text-slate-500">{rank.points}</span>
             </div>
             <Select value={rankings[index] || "none"} onValueChange={(value) => onChange(index, value)} disabled={disabled}>
-              <SelectTrigger className="w-full border-white/10 bg-white/5 text-slate-100">
+              <SelectTrigger aria-labelledby={`rank-${index}-label`} className="w-full border-white/10 bg-white/5 text-slate-100">
                 <SelectValue placeholder="Choose a showtime" />
               </SelectTrigger>
               <SelectContent>

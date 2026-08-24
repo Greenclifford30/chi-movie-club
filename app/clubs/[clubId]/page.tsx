@@ -100,6 +100,29 @@ export default function ActiveClubPage() {
     });
   }
 
+  function addShowtimeToBallot(showtimeId: string) {
+    setMessage(null);
+    const nextRankIndex = rankings.findIndex((ranking) => !ranking);
+    if (rankings.includes(showtimeId)) {
+      return;
+    }
+    if (nextRankIndex === -1) {
+      setMessage("Your ballot already has three choices. Use the ranking panel to edit it.");
+      return;
+    }
+    setRankings((current) => {
+      if (current.includes(showtimeId)) {
+        return current;
+      }
+      const rankIndex = current.findIndex((ranking) => !ranking);
+      if (rankIndex === -1) return current;
+      const next = [...current];
+      next[rankIndex] = showtimeId;
+      return next;
+    });
+    setMessage(`Added as your ${["first", "second", "third"][nextRankIndex]} choice.`);
+  }
+
   async function saveVote() {
     if (!token || !movieNight) {
       return;
@@ -172,6 +195,7 @@ export default function ActiveClubPage() {
               showtimeCount={data.showtimes.length}
               hasVote={hasSavedVote}
               confirmed={Boolean(isConfirmed && confirmedShowtime)}
+              votingOpen={isVoting}
               votingClosesAt={movieNight.votingClosesAt}
               historyHref={`/clubs/${clubId}/history`}
             />
@@ -196,8 +220,13 @@ export default function ActiveClubPage() {
                         <span className="rounded bg-violet-400/15 px-2 py-1 text-xs font-medium text-violet-100">{movieNight.status}</span>
                         <span className="rounded bg-cyan-400/10 px-2 py-1 text-xs font-medium text-cyan-100">{movie.releaseYear || "Release year TBD"}</span>
                       </div>
-                      <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl md:text-5xl">{movie.title}</h1>
-                      <p className="mt-4 max-w-2xl text-slate-300">{movie.overview || "Movie details will appear here once the admin saves a full movie snapshot."}</p>
+                      <h1 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl md:text-5xl">{movie.title}</h1>
+                      <div className="mt-4 flex flex-wrap gap-2 text-sm text-slate-300">
+                        {movie.runtime ? <span className="rounded border border-white/10 bg-white/5 px-2 py-1">{movie.runtime} min</span> : null}
+                        {movie.genres?.filter((genre): genre is string => typeof genre === "string").slice(0, 3).map((genre) => <span key={genre} className="rounded border border-white/10 bg-white/5 px-2 py-1">{genre}</span>)}
+                        {movie.rating ? <span className="rounded border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-amber-100">★ {movie.rating.toFixed(1)}</span> : null}
+                      </div>
+                      <p className="mt-4 max-w-2xl text-pretty leading-7 text-slate-300">{movie.overview || "Movie details will appear here once the admin saves a full movie snapshot."}</p>
                       <div className="mt-6 grid gap-3 sm:grid-cols-3">
                         <Stat icon={<CalendarDays className="size-5 text-amber-300" />} label="Target" value={formatDate(movieNight.targetDate)} />
                         <Stat icon={<Ticket className="size-5 text-cyan-300" />} label="Options" value={`${data.showtimes.length} showtimes`} />
@@ -241,7 +270,9 @@ export default function ActiveClubPage() {
                                 screenFormat={slot.screenFormat}
                                 ticketURI={slot.ticketURI}
                                 selected={confirmedShowtime?.showtimeId === slot.showtimeId || rankings.includes(slot.showtimeId)}
+                                rank={rankings.indexOf(slot.showtimeId) + 1 || undefined}
                                 compact
+                                onSelect={isVoting ? () => addShowtimeToBallot(slot.showtimeId) : undefined}
                               />
                             ))}
                           </div>
@@ -359,13 +390,14 @@ function Segmented({
   return (
     <div>
       <p className="mb-2 text-sm font-medium text-slate-200">{label}</p>
-      <div className="grid gap-2">
+      <div role="group" aria-label={label} className="grid gap-2">
         {options.map(([optionValue, optionLabel]) => (
           <button
             key={optionValue}
             type="button"
             onClick={() => onChange(optionValue)}
-            className={`min-h-11 rounded-lg border px-3 py-2 text-left text-sm transition ${
+            aria-pressed={value === optionValue}
+            className={`min-h-11 rounded-lg border px-3 py-2 text-left text-sm transition focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               value === optionValue
                 ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100"
                 : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"

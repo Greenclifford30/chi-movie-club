@@ -1408,7 +1408,7 @@ function CandidateShowtimesPanel({
                       return (
                         <div key={showtime.showtimeId} className="rounded-lg border border-white/10 bg-white/5 p-3">
                           <button type="button" onClick={() => onToggleSelected(showtime.showtimeId)} className="w-full text-left">
-                            <ShowtimeCardBody checked={selected} dateTime={showtimeDateTime(showtime)} screenFormat={showtime.screenFormat} ticketURI={showtime.ticketURI} />
+                            <ShowtimeCardBody selected={selected} dateTime={showtimeDateTime(showtime)} screenFormat={showtime.screenFormat} ticketURI={showtime.ticketURI} />
                           </button>
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                             <span className={`rounded px-2 py-1 text-xs ${showtime.status === "approved" ? "bg-green-400/10 text-green-100" : showtime.status === "rejected" ? "bg-rose-400/10 text-rose-100" : "bg-amber-400/10 text-amber-100"}`}>
@@ -2144,8 +2144,8 @@ function VotingControlCard({
             <StatusAlert tone="warning">
               Voting is not open yet. Only approved showtimes will appear on the member ballot.
             </StatusAlert>
-            <Field label="Voting deadline">
-              <Input type="datetime-local" value={votingClosesAt} onChange={(event) => onVotingClosesAtChange(event.target.value)} className="border-white/10 bg-white/5 text-white" />
+            <Field label="Voting deadline" htmlFor="voting-deadline">
+              <Input id="voting-deadline" type="datetime-local" value={votingClosesAt} onChange={(event) => onVotingClosesAtChange(event.target.value)} className="border-white/10 bg-white/5 text-white" />
             </Field>
             <Button onClick={onOpenVoting} disabled={isSaving || !movieNight || showtimeCount < 2 || !votingClosesAt} className="w-full bg-violet-500 text-white hover:bg-violet-600">
               {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}
@@ -2322,7 +2322,7 @@ function MemberList({ members }: { members: ClubMembership[] }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={htmlFor}>{label}</Label>

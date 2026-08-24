@@ -22,6 +22,7 @@ export function ActiveNightStateBanner({
   showtimeCount,
   hasVote,
   confirmed,
+  votingOpen,
   votingClosesAt,
   historyHref,
 }: {
@@ -29,10 +30,11 @@ export function ActiveNightStateBanner({
   showtimeCount: number;
   hasVote: boolean;
   confirmed: boolean;
+  votingOpen: boolean;
   votingClosesAt?: string;
   historyHref: string;
 }) {
-  const state = getState(status, showtimeCount, hasVote, confirmed);
+  const state = getState(status, showtimeCount, hasVote, confirmed, votingOpen);
   const Icon = state.icon;
 
   return (
@@ -75,7 +77,7 @@ export function ActiveNightStateBanner({
   );
 }
 
-function getState(status: MovieNightStatus, showtimeCount: number, hasVote: boolean, confirmed: boolean) {
+function getState(status: MovieNightStatus, showtimeCount: number, hasVote: boolean, confirmed: boolean, votingOpen: boolean) {
   if (status === "confirmed" || confirmed) {
     return {
       tone: "green" as const,
@@ -85,6 +87,17 @@ function getState(status: MovieNightStatus, showtimeCount: number, hasVote: bool
       action: "RSVP and ticket",
       anchor: "#rsvp",
       primaryClass: "bg-green-500 text-slate-950 hover:bg-green-400",
+    };
+  }
+  if (status === "voting" && !votingOpen) {
+    return {
+      tone: "amber" as const,
+      icon: Clock,
+      title: "Voting is closed",
+      description: "Your ballot is locked while the club admin confirms the final plan.",
+      action: "Review options",
+      anchor: "#showtimes",
+      primaryClass: "bg-amber-400 text-slate-950 hover:bg-amber-300",
     };
   }
   if (status === "voting") {
