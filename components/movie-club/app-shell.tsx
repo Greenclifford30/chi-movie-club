@@ -49,7 +49,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ProtectedPage>
-      <main className="min-h-screen text-slate-50">
+      <a
+        href="#main-content"
+        className="sr-only fixed left-4 top-4 z-[60] rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-950 focus:not-sr-only"
+      >
+        Skip to content
+      </a>
+      <main id="main-content" tabIndex={-1} className="min-h-screen pb-16 text-slate-50 outline-none md:pb-0">
         <header className="sticky top-0 z-50 border-b border-white/10 bg-[#111827]/90 backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-6">
@@ -89,6 +95,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         {children}
+        {links.length ? (
+          <nav aria-label="Club navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-slate-950/95 px-3 py-2 backdrop-blur-xl md:hidden">
+            <div className="mx-auto grid max-w-md grid-cols-3 gap-1">
+              {links.map((link) => {
+                const active = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-current={active ? "page" : undefined}
+                    className={active ? "rounded-md bg-white/10 px-2 py-2 text-center text-xs font-semibold text-white" : "rounded-md px-2 py-2 text-center text-xs text-slate-400 transition hover:bg-white/5 hover:text-white"}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        ) : null}
       </main>
     </ProtectedPage>
   );
