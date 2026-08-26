@@ -124,6 +124,14 @@ export function createClubInvites(token: string, clubId: string, emails: string[
   );
 }
 
+export function createShareableClubInvite(token: string, clubId: string) {
+  return apiFetch<{ invites: ClubInvite[] }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/invites`,
+    { method: "POST", body: JSON.stringify({ shareLink: true }) }
+  );
+}
+
 export function addClubMembers(token: string, clubId: string, emails: string[]) {
   return apiFetch<{ members: ClubMembership[] }>(
     token,

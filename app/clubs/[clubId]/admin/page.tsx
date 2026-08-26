@@ -49,6 +49,7 @@ import {
   closeVoting,
   confirmShowtime,
   createClubInvites,
+  createShareableClubInvite,
   createMovieNight,
   discoverMovies,
   getActiveMovieNight,
@@ -155,6 +156,7 @@ export default function ClubAdminPage() {
   const [votingState, setVotingState] = useState<ActionState>("idle");
   const [votingClosesAt, setVotingClosesAt] = useState("");
   const [inviteState, setInviteState] = useState<ActionState>("idle");
+  const [shareInviteState, setShareInviteState] = useState<ActionState>("idle");
   const [memberState, setMemberState] = useState<ActionState>("idle");
   const [confirmState, setConfirmState] = useState<ActionState>("idle");
   const [completeState, setCompleteState] = useState<ActionState>("idle");
@@ -676,13 +678,43 @@ export default function ClubAdminPage() {
     }
   }
 
+  async function handleCreateShareableInvite() {
+    if (!token) return;
+
+    setShareInviteState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await createShareableClubInvite(token, clubId);
+      const invite = result.invites[0];
+      setInvites((current) => [invite, ...current]);
+      setShareInviteState("saved");
+      await loadInvites();
+      let wasShared = false;
+      try {
+        wasShared = await shareInviteNatively(invite);
+      } catch {
+        // Safari can reject a share call after the network round trip that created the link.
+        // Copying still leaves the link ready to paste into Messages.
+      }
+      if (wasShared) {
+        setMessage("Share link ready.");
+      } else {
+        await handleCopyInvite(invite);
+      }
+    } catch (inviteError) {
+      setShareInviteState("error");
+      setError(inviteError instanceof Error ? inviteError.message : "Unable to create a share link.");
+    }
+  }
+
   async function handleCopyInvite(invite: ClubInvite) {
     if (!invite.inviteUrl) {
       return;
     }
     await navigator.clipboard?.writeText(invite.inviteUrl);
     setCopiedInviteId(invite.inviteId);
-    setMessage(`Invite link copied for ${invite.email}.`);
+    setMessage(invite.email ? `Invite link copied for ${invite.email}.` : "Share link copied.");
     window.setTimeout(() => setCopiedInviteId(null), 1800);
   }
 
@@ -696,7 +728,7 @@ export default function ClubAdminPage() {
     try {
       const wasShared = await shareInviteNatively(invite);
       if (wasShared) {
-        setMessage(`Invite shared for ${invite.email}.`);
+        setMessage(invite.email ? `Invite shared for ${invite.email}.` : "Share link shared.");
       }
     } catch (shareError) {
       setError(shareError instanceof Error ? shareError.message : "Unable to share invite.");
@@ -1042,9 +1074,19 @@ export default function ClubAdminPage() {
             <Card className="order-6 border-white/10 bg-slate-900/80 py-6">
               <CardHeader>
                 <h2 className="font-semibold text-white">Club invites</h2>
-                <p className="text-sm text-slate-400">Create invite links for friends joining this club.</p>
+                <p className="text-sm text-slate-400">Send a single-use link from Messages, or create an email-specific invite below.</p>
               </CardHeader>
               <CardContent className="space-y-4">
+                <Button
+                  type="button"
+                  onClick={handleCreateShareableInvite}
+                  disabled={shareInviteState === "saving"}
+                  className="w-full bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                >
+                  {shareInviteState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Share2 className="size-4" />}
+                  Invite via Messages
+                </Button>
+                <div className="flex items-center gap-3 text-xs text-slate-500 before:h-px before:flex-1 before:bg-white/10 after:h-px after:flex-1 after:bg-white/10">or invite by email</div>
                 <form onSubmit={handleCreateInvites} className="space-y-3">
                   <Field label="Email addresses">
                     <textarea
@@ -2203,7 +2245,7 @@ export function inviteShareData(invite: ClubInvite): ShareData {
   const clubName = invite.clubName || "this movie club";
   return {
     title: `Join ${clubName}`,
-    text: `You're invited to join ${clubName} for movie nights.`,
+    text: `You're invited to join ${clubName} for movie nights. This link can be used once.`,
     url: invite.inviteUrl,
   };
 }
@@ -2252,7 +2294,7 @@ export function InviteList({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <p className="truncate font-medium text-white">{invite.email}</p>
+                <p className="truncate font-medium text-white">{invite.email || "Shareable link"}</p>
                 <InviteBadge status={invite.status} />
               </div>
               <p className="mt-1 text-xs text-slate-400">Expires {formatDate(invite.expiresAt)}</p>
@@ -2264,7 +2306,7 @@ export function InviteList({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    aria-label={`Share invite for ${invite.email}`}
+                    aria-label={`Share invite for ${invite.email || "this link"}`}
                     onClick={() => onShare(invite)}
                     className="text-cyan-200 hover:bg-white/10"
                   >
@@ -2277,7 +2319,7 @@ export function InviteList({
                   size="icon"
                   variant="ghost"
                   title="Copy invite link"
-                  aria-label={`Copy invite link for ${invite.email}`}
+                  aria-label={`Copy invite link for ${invite.email || "this link"}`}
                   onClick={() => onCopy(invite)}
                   className="text-slate-200 hover:bg-white/10"
                 >

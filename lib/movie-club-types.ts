@@ -30,7 +30,9 @@ export interface ClubInvite {
   clubId: string;
   clubName?: string;
   inviteId: string;
-  email: string;
+  /** Empty for a single-use link that can be claimed by its recipient. */
+  email?: string;
+  inviteType?: "email" | "share_link";
   role: "friend";
   status: "pending" | "accepted" | "expired";
   expiresAt: string;

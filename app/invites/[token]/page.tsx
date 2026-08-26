@@ -81,9 +81,7 @@ export default function InvitePage() {
   }, [acceptState, authToken, invite, inviteToken, isAuthLoading, isAuthenticated, router]);
 
   const isLoading = isLoadingInvite || isAuthLoading;
-  const signedInMismatch = Boolean(
-    email && invite?.email && email.trim().toLowerCase() !== invite.email.trim().toLowerCase()
-  );
+  const signedInMismatch = Boolean(email && invite?.email && email.trim().toLowerCase() !== invite.email.trim().toLowerCase());
 
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-4 text-slate-50 sm:py-10">
@@ -112,7 +110,7 @@ export default function InvitePage() {
                 Join {invite.clubName || "this movie club"}
               </h1>
               <p className="mt-3 text-slate-300">
-                This invite is for <span className="font-medium text-white">{invite.email}</span> and expires {formatDate(invite.expiresAt, "MMM d, yyyy")}.
+                {invite.email ? <>This invite is for <span className="font-medium text-white">{invite.email}</span>.</> : "This single-use link is ready for you to claim."} It expires {formatDate(invite.expiresAt, "MMM d, yyyy")}.
               </p>
             </div>
 

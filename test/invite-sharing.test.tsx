@@ -18,6 +18,13 @@ const invite: ClubInvite = {
   inviteUrl: "https://movies.example.com/invites/token",
 };
 
+const shareLinkInvite: ClubInvite = {
+  ...invite,
+  inviteId: "invite-share-link",
+  email: undefined,
+  inviteType: "share_link",
+};
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -28,7 +35,7 @@ describe("native invite sharing", () => {
   it("builds club-specific share content", () => {
     expect(inviteShareData(invite)).toEqual({
       title: "Join Chicago Movie Club",
-      text: "You're invited to join Chicago Movie Club for movie nights.",
+      text: "You're invited to join Chicago Movie Club for movie nights. This link can be used once.",
       url: invite.inviteUrl,
     });
   });
@@ -39,6 +46,10 @@ describe("native invite sharing", () => {
 
     await expect(shareInviteNatively(invite)).resolves.toBe(true);
     expect(share).toHaveBeenCalledWith(inviteShareData(invite));
+  });
+
+  it("marks a share link as single-use in the share sheet", () => {
+    expect(inviteShareData(shareLinkInvite).text).toContain("used once");
   });
 
   it("treats share-sheet cancellation as a non-error", async () => {
