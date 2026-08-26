@@ -34,6 +34,9 @@ async function proxy(req: NextRequest, context: Context) {
     headers: {
       "Content-Type": req.headers.get("content-type") || "application/json",
       ...(authHeader ? { Authorization: authHeader } : {}),
+      // Invite links are assembled by the API. Forward the browser-facing origin,
+      // rather than the private API Gateway host, so shared links open the app.
+      "x-movie-club-app-origin": req.nextUrl.origin,
       "x-api-key": apiKey,
     },
     body,
