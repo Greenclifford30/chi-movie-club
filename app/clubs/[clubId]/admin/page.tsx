@@ -1074,7 +1074,7 @@ export default function ClubAdminPage() {
             <Card className="order-6 border-white/10 bg-slate-900/80 py-6">
               <CardHeader>
                 <h2 className="font-semibold text-white">Club invites</h2>
-                <p className="text-sm text-slate-400">Send a single-use link from Messages, or create an email-specific invite below.</p>
+                <p className="text-sm text-slate-400">Send a reusable link from Messages, or create an email-specific invite below.</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Button
@@ -2245,7 +2245,7 @@ export function inviteShareData(invite: ClubInvite): ShareData {
   const clubName = invite.clubName || "this movie club";
   return {
     title: `Join ${clubName}`,
-    text: `You're invited to join ${clubName} for movie nights. This link can be used once.`,
+    text: `You're invited to join ${clubName} for movie nights.`,
     url: invite.inviteUrl,
   };
 }

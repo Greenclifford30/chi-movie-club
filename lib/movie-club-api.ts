@@ -144,11 +144,11 @@ export function getInvite(token: string) {
   return publicApiFetch<{ invite: ClubInvite }>(`/invites/${encodeURIComponent(token)}`);
 }
 
-export function acceptInvite(authToken: string, inviteToken: string) {
+export function acceptInvite(authToken: string, inviteToken: string, signal?: AbortSignal) {
   return apiFetch<{ membership: ClubMembership; clubId: string }>(
     authToken,
     `/invites/${encodeURIComponent(inviteToken)}/accept`,
-    { method: "POST", body: JSON.stringify({}) }
+    { method: "POST", body: JSON.stringify({}), signal }
   );
 }
 

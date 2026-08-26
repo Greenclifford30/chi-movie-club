@@ -35,7 +35,7 @@ describe("native invite sharing", () => {
   it("builds club-specific share content", () => {
     expect(inviteShareData(invite)).toEqual({
       title: "Join Chicago Movie Club",
-      text: "You're invited to join Chicago Movie Club for movie nights. This link can be used once.",
+      text: "You're invited to join Chicago Movie Club for movie nights.",
       url: invite.inviteUrl,
     });
   });
@@ -48,8 +48,8 @@ describe("native invite sharing", () => {
     expect(share).toHaveBeenCalledWith(inviteShareData(invite));
   });
 
-  it("marks a share link as single-use in the share sheet", () => {
-    expect(inviteShareData(shareLinkInvite).text).toContain("used once");
+  it("uses the same friendly message for a reusable share link", () => {
+    expect(inviteShareData(shareLinkInvite).text).toBe("You're invited to join Chicago Movie Club for movie nights.");
   });
 
   it("treats share-sheet cancellation as a non-error", async () => {

@@ -57,11 +57,13 @@ export default function InvitePage() {
 
     const currentAuthToken = authToken;
     let cancelled = false;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
     async function acceptCurrentInvite() {
       setAcceptState("accepting");
       setError(null);
       try {
-        const result = await acceptInvite(currentAuthToken, inviteToken);
+        const result = await acceptInvite(currentAuthToken, inviteToken, controller.signal);
         if (!cancelled) {
           setAcceptState("accepted");
           router.replace(`/clubs/${encodeURIComponent(result.clubId)}`);
@@ -69,14 +71,18 @@ export default function InvitePage() {
       } catch (acceptError) {
         if (!cancelled) {
           setAcceptState("error");
-          setError(inviteErrorMessage(acceptError));
+          setError(controller.signal.aborted ? "This is taking longer than expected. Your invite may already be accepted; try again to continue." : inviteErrorMessage(acceptError));
         }
+      } finally {
+        window.clearTimeout(timeout);
       }
     }
 
     acceptCurrentInvite();
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
+      controller.abort();
     };
   }, [acceptState, authToken, invite, inviteToken, isAuthLoading, isAuthenticated, router]);
 
@@ -110,7 +116,7 @@ export default function InvitePage() {
                 Join {invite.clubName || "this movie club"}
               </h1>
               <p className="mt-3 text-slate-300">
-                {invite.email ? <>This invite is for <span className="font-medium text-white">{invite.email}</span>.</> : "This single-use link is ready for you to claim."} It expires {formatDate(invite.expiresAt, "MMM d, yyyy")}.
+                {invite.email ? <>This invite is for <span className="font-medium text-white">{invite.email}</span>.</> : "This link is ready for you and your friends to join."} It expires {formatDate(invite.expiresAt, "MMM d, yyyy")}.
               </p>
             </div>
 
@@ -141,6 +147,11 @@ export default function InvitePage() {
                 <p className="text-sm text-slate-300">
                   Signed in as <span className="font-medium text-white">{email}</span>.
                 </p>
+                {!signedInMismatch ? (
+                  <Button onClick={() => setAcceptState("idle")} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+                    Try again
+                  </Button>
+                ) : null}
                 <Button
                   variant="outline"
                   onClick={() => {
