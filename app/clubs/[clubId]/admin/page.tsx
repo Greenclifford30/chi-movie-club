@@ -678,6 +678,20 @@ export default function ClubAdminPage() {
     }
   }
 
+  function handleSelectMovie(movie: MovieSnapshot) {
+    setSelectedMovie(movie);
+    if (movie.status !== "coming_soon" || !movie.releaseDate || movie.releaseDate < today) {
+      return;
+    }
+    setTargetDate(movie.releaseDate);
+    setPlanningForm((current) => ({
+      ...current,
+      targetDate: movie.releaseDate!,
+      dateWindowStart: movie.releaseDate!,
+      dateWindowEnd: movie.releaseDate!,
+    }));
+  }
+
   async function handleCreateShareableInvite() {
     if (!token) return;
 
@@ -895,7 +909,7 @@ export default function ClubAdminPage() {
                 Loading current theatrical releases...
               </div>
             ) : (
-              <MovieGrid movies={nowPlayingMovies} selectedMovie={selectedMovie} onSelect={canEditSetup ? setSelectedMovie : undefined} emptyText="No now-playing movies loaded yet. Use search or try again shortly." compact />
+              <MovieGrid movies={nowPlayingMovies} selectedMovie={selectedMovie} onSelect={canEditSetup ? handleSelectMovie : undefined} emptyText="No movies loaded yet. Use search or try again shortly." compact />
             )}
             <div className="mt-6 border-t border-white/10 pt-5">
               <h3 className="font-semibold text-white">Search the movie catalog</h3>
@@ -909,7 +923,7 @@ export default function ClubAdminPage() {
               </form>
               {movies.length ? (
                 <div className="mt-5">
-                  <MovieGrid movies={movies} selectedMovie={selectedMovie} onSelect={canEditSetup ? setSelectedMovie : undefined} emptyText="Search results will appear here." compact />
+                  <MovieGrid movies={movies} selectedMovie={selectedMovie} onSelect={canEditSetup ? handleSelectMovie : undefined} emptyText="Search results will appear here." compact />
                 </div>
               ) : null}
             </div>
@@ -1418,6 +1432,17 @@ function CandidateShowtimesPanel({
             <StatusAlert tone="danger" className="mt-3">{summary?.errorMessage || "The provider import failed. Try again shortly."}</StatusAlert>
           ) : null}
         </div>
+
+        {movieNight?.showtimeMonitoring?.status === "active" ? (
+          <StatusAlert tone="info">
+            Watching for tickets and showtimes automatically. {movieNight.showtimeMonitoring.lastCheckedAt ? `Last checked ${formatDate(movieNight.showtimeMonitoring.lastCheckedAt)}. ` : ""}
+            {movieNight.showtimeMonitoring.nextCheckAt ? `Next check ${formatDate(movieNight.showtimeMonitoring.nextCheckAt)}.` : "The next check will run within a day."}
+          </StatusAlert>
+        ) : movieNight?.showtimeMonitoring?.status === "found" ? (
+          <StatusAlert tone="success">
+            Showtimes are available. Review and approve the imported candidates before opening voting.
+          </StatusAlert>
+        ) : null}
 
         {showtimes.length ? (
           <>

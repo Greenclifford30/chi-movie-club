@@ -89,6 +89,7 @@ export interface MovieNight {
   showtimeImportStatus?: "idle" | "queued" | "running" | "completed" | "failed" | string;
   lastShowtimeImportAt?: string;
   lastShowtimeImportSummary?: ShowtimeImportSummary;
+  showtimeMonitoring?: ShowtimeMonitoring;
   votingClosesAt?: string;
   votingClosedAt?: string;
   votingClosedBy?: string;
@@ -101,6 +102,16 @@ export interface MovieNight {
   completedBy?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ShowtimeMonitoring {
+  status: "active" | "found" | "failed" | "disabled" | string;
+  lastCheckedAt?: string;
+  nextCheckAt?: string;
+  foundAt?: string;
+  notifiedAt?: string;
+  resultCount?: number;
+  lastError?: string;
 }
 
 export interface Showtime {
