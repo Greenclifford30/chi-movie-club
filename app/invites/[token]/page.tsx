@@ -20,6 +20,7 @@ export default function InvitePage() {
   const [invite, setInvite] = useState<ClubInvite | null>(null);
   const [isLoadingInvite, setIsLoadingInvite] = useState(true);
   const [acceptState, setAcceptState] = useState<AcceptState>("idle");
+  const [acceptAttempt, setAcceptAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const redirectPath = useMemo(() => `/invites/${encodeURIComponent(inviteToken)}`, [inviteToken]);
 
@@ -51,7 +52,9 @@ export default function InvitePage() {
   }, [inviteToken]);
 
   useEffect(() => {
-    if (isAuthLoading || !isAuthenticated || !authToken || !invite || acceptState !== "idle") {
+    // Do not depend on acceptState here. Updating it to "accepting" must not
+    // immediately run this effect's cleanup and abort the request it just started.
+    if (isAuthLoading || !isAuthenticated || !authToken || !invite) {
       return;
     }
 
@@ -84,7 +87,7 @@ export default function InvitePage() {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [acceptState, authToken, invite, inviteToken, isAuthLoading, isAuthenticated, router]);
+  }, [acceptAttempt, authToken, invite, inviteToken, isAuthLoading, isAuthenticated, router]);
 
   const isLoading = isLoadingInvite || isAuthLoading;
   const signedInMismatch = Boolean(email && invite?.email && email.trim().toLowerCase() !== invite.email.trim().toLowerCase());
@@ -148,7 +151,13 @@ export default function InvitePage() {
                   Signed in as <span className="font-medium text-white">{email}</span>.
                 </p>
                 {!signedInMismatch ? (
-                  <Button onClick={() => setAcceptState("idle")} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+                  <Button
+                    onClick={() => {
+                      setAcceptState("idle");
+                      setAcceptAttempt((attempt) => attempt + 1);
+                    }}
+                    className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                  >
                     Try again
                   </Button>
                 ) : null}
