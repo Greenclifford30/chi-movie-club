@@ -25,11 +25,24 @@ import type {
 
 export class MovieClubApiError extends Error {
   status: number;
+  requestId?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, requestId?: string) {
     super(message);
     this.name = "MovieClubApiError";
     this.status = status;
+    this.requestId = requestId;
+  }
+}
+
+function parseResponseBody(text: string) {
+  if (!text) {
+    return null;
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
   }
 }
 
@@ -48,13 +61,16 @@ async function apiFetch<T>(
   });
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  const data = parseResponseBody(text);
 
   if (!response.ok) {
     const body = data as ApiErrorBody | null;
     throw new MovieClubApiError(
-      body?.error || body?.message || "Movie Club API request failed.",
-      response.status
+      body && typeof body === "object" && ("error" in body || "message" in body)
+        ? ((body as ApiErrorBody).error || (body as ApiErrorBody).message || "Movie Club API request failed.")
+        : "Movie Club API request failed.",
+      response.status,
+      response.headers.get("x-movie-club-request-id") || undefined,
     );
   }
 
@@ -71,13 +87,16 @@ async function publicApiFetch<T>(path: string, init: RequestInit = {}): Promise<
   });
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  const data = parseResponseBody(text);
 
   if (!response.ok) {
     const body = data as ApiErrorBody | null;
     throw new MovieClubApiError(
-      body?.error || body?.message || "Movie Club API request failed.",
-      response.status
+      body && typeof body === "object" && ("error" in body || "message" in body)
+        ? ((body as ApiErrorBody).error || (body as ApiErrorBody).message || "Movie Club API request failed.")
+        : "Movie Club API request failed.",
+      response.status,
+      response.headers.get("x-movie-club-request-id") || undefined,
     );
   }
 

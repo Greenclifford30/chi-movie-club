@@ -204,22 +204,23 @@ function Alert({ children }: { children: React.ReactNode }) {
 
 function inviteErrorMessage(error: unknown) {
   if (error instanceof MovieClubApiError) {
+    const requestId = error.requestId ? ` Reference: ${error.requestId}.` : "";
     if (error.status === 401) {
-      return "Sign in is required to accept this invite.";
+      return `Sign in is required to accept this invite.${requestId}`;
     }
     if (error.status === 403) {
-      return "This invite belongs to a different email address. Sign in with the invited email to accept it.";
+      return `This invite belongs to a different email address. Sign in with the invited email to accept it.${requestId}`;
     }
     if (error.status === 404) {
-      return "This invite link was not found.";
+      return `This invite link was not found.${requestId}`;
     }
     if (error.status === 409) {
-      return "This invite is no longer pending.";
+      return `This invite is no longer pending.${requestId}`;
     }
     if (error.status === 410) {
-      return "This invite has expired.";
+      return `This invite has expired.${requestId}`;
     }
-    return error.message;
+    return `${error.message}${requestId}`;
   }
 
   return error instanceof Error ? error.message : "Unable to load invite.";
