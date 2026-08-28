@@ -680,7 +680,7 @@ export default function ClubAdminPage() {
 
   function handleSelectMovie(movie: MovieSnapshot) {
     setSelectedMovie(movie);
-    if (movie.status !== "coming_soon" || !movie.releaseDate || movie.releaseDate < today) {
+    if (!movie.releaseDate || movie.releaseDate < today) {
       return;
     }
     setTargetDate(movie.releaseDate);
