@@ -21,6 +21,7 @@ import type {
   Vote,
   VoteResults,
   UserPlanningPreferences,
+  Notification,
 } from "@/lib/movie-club-types";
 
 export class MovieClubApiError extends Error {
@@ -120,7 +121,7 @@ export function getUserPlanningPreferences(token: string) {
 
 export function updateUserPlanningPreferences(
   token: string,
-  preferences: Pick<UserPlanningPreferences, "defaultZipCode" | "defaultRadiusMiles" | "preferredFormats">
+  preferences: Pick<UserPlanningPreferences, "defaultZipCode" | "defaultRadiusMiles" | "preferredFormats"> & { reminderEmailsEnabled?: boolean }
 ) {
   return apiFetch<{ preferences: UserPlanningPreferences }>(token, "/me/preferences", {
     method: "PUT",
@@ -133,6 +134,18 @@ export function listClubInvites(token: string, clubId: string) {
     token,
     `/clubs/${encodeURIComponent(clubId)}/invites`
   );
+}
+
+export function listNotifications(token: string) {
+  return apiFetch<{ notifications: Notification[]; unreadCount: number }>(token, "/me/notifications");
+}
+
+export function markNotificationRead(token: string, notificationId: string) {
+  return apiFetch<{ notification: Notification }>(token, `/me/notifications/${encodeURIComponent(notificationId)}`, { method: "POST", body: "{}" });
+}
+
+export function markAllNotificationsRead(token: string) {
+  return apiFetch<{ readAt: string }>(token, "/me/notifications/read-all", { method: "POST", body: "{}" });
 }
 
 export function revokeClubInvite(token: string, clubId: string, inviteId: string) {
@@ -413,6 +426,12 @@ export function completeMovieNight(token: string, movieNightId: string) {
     token,
     `/movie-nights/${encodeURIComponent(movieNightId)}/complete`,
     { method: "POST", body: JSON.stringify({}) }
+  );
+}
+
+export function cancelMovieNight(token: string, movieNightId: string) {
+  return apiFetch<{ movieNight: ActiveMovieNightResponse["movieNight"] }>(
+    token, `/movie-nights/${encodeURIComponent(movieNightId)}/cancel`, { method: "POST", body: "{}" }
   );
 }
 

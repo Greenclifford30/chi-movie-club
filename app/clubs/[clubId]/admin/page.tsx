@@ -45,6 +45,7 @@ import {
   addShowtimes,
   approveBulkShowtimeCandidates,
   approveShowtimeCandidate,
+  cancelMovieNight,
   completeMovieNight,
   closeVoting,
   confirmShowtime,
@@ -162,6 +163,7 @@ export default function ClubAdminPage() {
   const [inviteClearState, setInviteClearState] = useState<ActionState>("idle");
   const [confirmState, setConfirmState] = useState<ActionState>("idle");
   const [completeState, setCompleteState] = useState<ActionState>("idle");
+  const [cancelState, setCancelState] = useState<ActionState>("idle");
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [supportsNativeShare, setSupportsNativeShare] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -665,6 +667,21 @@ export default function ClubAdminPage() {
     }
   }
 
+  async function handleCancelMovieNight() {
+    if (!token || !active?.movieNight) return;
+    if (!window.confirm("Cancel this movie night? All club members will be notified.")) return;
+    setCancelState("saving"); setError(null); setMessage(null);
+    try {
+      await cancelMovieNight(token, active.movieNight.movieNightId);
+      setCancelState("saved");
+      setMessage("Movie night cancelled and members notified.");
+      await loadActive();
+    } catch (cancelError) {
+      setCancelState("error");
+      setError(cancelError instanceof Error ? cancelError.message : "Unable to cancel movie night.");
+    }
+  }
+
   async function handleCreateInvites(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) {
@@ -1105,6 +1122,11 @@ export default function ClubAdminPage() {
                     {completeState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                     End event
                   </Button>
+                  {movieNight && ["planning", "voting", "confirmed"].includes(movieNight.status) ? (
+                    <Button type="button" variant="outline" onClick={handleCancelMovieNight} disabled={cancelState === "saving"} className="mt-3 w-full border-rose-400/40 text-rose-200 hover:bg-rose-500/10">
+                      {cancelState === "saving" ? <Loader2 className="size-4 animate-spin" /> : null}Cancel movie night
+                    </Button>
+                  ) : null}
                 </CardContent>
               </Card>
             ) : null}

@@ -65,6 +65,7 @@ export default function SettingsPage() {
         defaultZipCode: preferences.defaultZipCode.trim(),
         defaultRadiusMiles: preferences.defaultRadiusMiles,
         preferredFormats: preferences.preferredFormats,
+        reminderEmailsEnabled: preferences.reminderEmailsEnabled !== false,
       });
       setPreferences(result.preferences);
       setMessage("Planning defaults saved.");
@@ -106,6 +107,10 @@ export default function SettingsPage() {
             <Button onClick={handleSave} disabled={isLoading || isSaving} className="w-full bg-violet-500 text-white hover:bg-violet-600 sm:w-auto">
               {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Save defaults
             </Button>
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+              <input type="checkbox" checked={preferences.reminderEmailsEnabled !== false} onChange={(event) => setPreferences((current) => ({ ...current, reminderEmailsEnabled: event.target.checked }))} className="mt-0.5 size-4 accent-cyan-400" />
+              <span><span className="block font-medium text-white">Email deadline reminders</span>Receive vote and RSVP reminders. Important plan changes always remain in your activity inbox.</span>
+            </label>
           </CardContent>
         </Card>
       </div>

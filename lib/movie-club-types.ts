@@ -23,6 +23,7 @@ export interface UserPlanningPreferences {
   defaultZipCode: string;
   defaultRadiusMiles: number;
   preferredFormats: string[];
+  reminderEmailsEnabled?: boolean;
   updatedAt?: string;
 }
 
@@ -102,6 +103,18 @@ export interface MovieNight {
   completedBy?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface Notification {
+  notificationId: string;
+  type: "voting_open" | "showtime_confirmed" | "showtime_changed" | "movie_night_cancelled" | "vote_reminder" | "rsvp_reminder";
+  title: string;
+  body: string;
+  href: string;
+  clubId: string;
+  movieNightId: string;
+  createdAt: string;
+  readAt?: string;
 }
 
 export interface ShowtimeMonitoring {

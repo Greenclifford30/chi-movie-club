@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
+import { NotificationBell } from "@/components/movie-club/notification-bell";
 
 export function ProtectedPage({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -88,6 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </nav>
             </div>
             <div className="flex items-center gap-2">
+              <NotificationBell />
               <ThemeToggle />
               <Button asChild variant="ghost" size="icon" title="Account settings">
                 <Link href="/settings">
