@@ -34,7 +34,7 @@ export interface ClubInvite {
   email?: string;
   inviteType?: "email" | "share_link";
   role: "friend";
-  status: "pending" | "accepted" | "expired";
+  status: "pending" | "accepted" | "expired" | "revoked";
   expiresAt: string;
   expiresAtEpoch?: number;
   createdAt?: string;

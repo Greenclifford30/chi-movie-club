@@ -129,3 +129,7 @@ export async function POST(req: NextRequest, context: Context) {
 export async function PUT(req: NextRequest, context: Context) {
   return proxy(req, context);
 }
+
+export async function DELETE(req: NextRequest, context: Context) {
+  return proxy(req, context);
+}

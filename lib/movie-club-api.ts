@@ -135,6 +135,29 @@ export function listClubInvites(token: string, clubId: string) {
   );
 }
 
+export function revokeClubInvite(token: string, clubId: string, inviteId: string) {
+  return apiFetch<{ inviteId: string; status: "revoked" }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/invites/${encodeURIComponent(inviteId)}`,
+    { method: "DELETE" }
+  );
+}
+
+export function revokeAllClubInvites(token: string, clubId: string) {
+  return apiFetch<{ revokedCount: number }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/invites`,
+    { method: "DELETE" }
+  );
+}
+
+export function listClubMembers(token: string, clubId: string) {
+  return apiFetch<{ members: ClubMembership[] }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/members`
+  );
+}
+
 export function createClubInvites(token: string, clubId: string, emails: string[]) {
   return apiFetch<{ invites: ClubInvite[] }>(
     token,
@@ -148,14 +171,6 @@ export function createShareableClubInvite(token: string, clubId: string) {
     token,
     `/clubs/${encodeURIComponent(clubId)}/invites`,
     { method: "POST", body: JSON.stringify({ shareLink: true }) }
-  );
-}
-
-export function addClubMembers(token: string, clubId: string, emails: string[]) {
-  return apiFetch<{ members: ClubMembership[] }>(
-    token,
-    `/clubs/${encodeURIComponent(clubId)}/members`,
-    { method: "POST", body: JSON.stringify({ emails, role: "friend" }) }
   );
 }
 

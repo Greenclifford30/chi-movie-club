@@ -17,6 +17,7 @@ import {
   Share2,
   ShieldCheck,
   Ticket,
+  Trash2,
   Users,
   Vote,
 } from "lucide-react";
@@ -42,7 +43,6 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import {
   addShowtimes,
-  addClubMembers,
   approveBulkShowtimeCandidates,
   approveShowtimeCandidate,
   completeMovieNight,
@@ -58,8 +58,11 @@ import {
   getVoteResults,
   importShowtimesForMovieNight,
   listClubInvites,
+  listClubMembers,
   MovieClubApiError,
   openVoting,
+  revokeAllClubInvites,
+  revokeClubInvite,
   refreshGracenote,
   rejectShowtimeCandidate,
   searchGracenoteShowtimes,
@@ -116,8 +119,7 @@ export default function ClubAdminPage() {
   const [attendance, setAttendance] = useState<AttendanceResponse | null>(null);
   const [invites, setInvites] = useState<ClubInvite[]>([]);
   const [inviteEmails, setInviteEmails] = useState("");
-  const [memberEmails, setMemberEmails] = useState("");
-  const [addedMembers, setAddedMembers] = useState<ClubMembership[]>([]);
+  const [members, setMembers] = useState<ClubMembership[]>([]);
   const [results, setResults] = useState<VoteResults | null>(null);
   const [movies, setMovies] = useState<MovieSnapshot[]>([]);
   const [nowPlayingMovies, setNowPlayingMovies] = useState<MovieSnapshot[]>([]);
@@ -157,7 +159,7 @@ export default function ClubAdminPage() {
   const [votingClosesAt, setVotingClosesAt] = useState("");
   const [inviteState, setInviteState] = useState<ActionState>("idle");
   const [shareInviteState, setShareInviteState] = useState<ActionState>("idle");
-  const [memberState, setMemberState] = useState<ActionState>("idle");
+  const [inviteClearState, setInviteClearState] = useState<ActionState>("idle");
   const [confirmState, setConfirmState] = useState<ActionState>("idle");
   const [completeState, setCompleteState] = useState<ActionState>("idle");
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
@@ -243,6 +245,19 @@ export default function ClubAdminPage() {
     }
   }
 
+  async function loadMembers() {
+    if (!token) return;
+    try {
+      const result = await listClubMembers(token, clubId);
+      setMembers(result.members);
+    } catch (memberError) {
+      setMembers([]);
+      if (memberError instanceof MovieClubApiError) {
+        setError(memberError.message);
+      }
+    }
+  }
+
   async function loadAttendance(movieNightId: string) {
     if (!token) return;
     try {
@@ -274,7 +289,7 @@ export default function ClubAdminPage() {
   useEffect(() => {
     let cancelled = false;
     setIsWorkspaceLoading(true);
-    Promise.all([loadActive(), loadInvites()]).finally(() => {
+    Promise.all([loadActive(), loadInvites(), loadMembers()]).finally(() => {
       if (!cancelled) setIsWorkspaceLoading(false);
     });
     return () => { cancelled = true; };
@@ -749,28 +764,37 @@ export default function ClubAdminPage() {
     }
   }
 
-  async function handleAddMembers(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token) return;
+  async function handleRevokeInvite(invite: ClubInvite) {
+    if (!token || !window.confirm(`Revoke the invite for ${invite.email || "this shareable link"}? Anyone with this link will no longer be able to join.`)) return;
 
-    const emails = normalizeEmails(memberEmails);
-    if (!emails.length) {
-      setError("Enter at least one valid email address.");
-      return;
-    }
-
-    setMemberState("saving");
+    setInviteClearState("saving");
     setError(null);
     setMessage(null);
     try {
-      const result = await addClubMembers(token, clubId, emails);
-      setAddedMembers(result.members);
-      setMemberEmails("");
-      setMemberState("saved");
-      setMessage(`${result.members.length} member${result.members.length === 1 ? "" : "s"} added to this club.`);
-    } catch (memberError) {
-      setMemberState("error");
-      setError(memberError instanceof Error ? memberError.message : "Unable to add club members.");
+      await revokeClubInvite(token, clubId, invite.inviteId);
+      setInvites((current) => current.filter((currentInvite) => currentInvite.inviteId !== invite.inviteId));
+      setInviteClearState("saved");
+      setMessage("Invite revoked.");
+    } catch (inviteError) {
+      setInviteClearState("error");
+      setError(inviteError instanceof Error ? inviteError.message : "Unable to revoke invite.");
+    }
+  }
+
+  async function handleClearAllInvites() {
+    if (!token || !invites.length || !window.confirm(`Clear all ${invites.length} pending invite${invites.length === 1 ? "" : "s"}? Existing links will stop working.`)) return;
+
+    setInviteClearState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      const { revokedCount } = await revokeAllClubInvites(token, clubId);
+      setInvites([]);
+      setInviteClearState("saved");
+      setMessage(`${revokedCount} pending invite${revokedCount === 1 ? "" : "s"} cleared.`);
+    } catch (inviteError) {
+      setInviteClearState("error");
+      setError(inviteError instanceof Error ? inviteError.message : "Unable to clear pending invites.");
     }
   }
 
@@ -1115,12 +1139,26 @@ export default function ClubAdminPage() {
                     Create invites
                   </Button>
                 </form>
+                {invites.length ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleClearAllInvites}
+                    disabled={inviteClearState === "saving"}
+                    className="w-full border-rose-300/30 text-rose-100 hover:bg-rose-400/10 hover:text-rose-50"
+                  >
+                    {inviteClearState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                    Clear all pending invites
+                  </Button>
+                ) : null}
                 <InviteList
                   invites={invites}
                   copiedInviteId={copiedInviteId}
                   supportsNativeShare={supportsNativeShare}
                   onCopy={handleCopyInvite}
                   onShare={handleShareInvite}
+                  onRevoke={handleRevokeInvite}
+                  isRevoking={inviteClearState === "saving"}
                 />
               </CardContent>
             </Card>
@@ -1128,26 +1166,9 @@ export default function ClubAdminPage() {
             <Card className="order-7 border-white/10 bg-slate-900/80 py-6">
               <CardHeader>
                 <h2 className="font-semibold text-white">Club members</h2>
-                <p className="text-sm text-slate-400">Add existing platform users to this club as friends.</p>
+                <p className="text-sm text-slate-400">Current active users in this club.</p>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <form onSubmit={handleAddMembers} className="space-y-3">
-                <Field label="Platform user emails" htmlFor="member-emails">
-                  <textarea
-                      id="member-emails"
-                      value={memberEmails}
-                      onChange={(event) => setMemberEmails(event.target.value)}
-                      placeholder="signed-in-user@example.com, friend@example.com"
-                      className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-base text-white outline-none transition placeholder:text-slate-500 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
-                    />
-                  </Field>
-                  <Button type="submit" disabled={memberState === "saving" || !memberEmails.trim()} className="w-full bg-violet-500 text-white hover:bg-violet-600">
-                    {memberState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                    Add as friends
-                  </Button>
-                </form>
-                <MemberList members={addedMembers} />
-              </CardContent>
+              <CardContent><MemberList members={members} /></CardContent>
             </Card>
 
             {movieNight?.status === "confirmed" && movieNight.confirmedShowtime ? (
@@ -2297,12 +2318,16 @@ export function InviteList({
   supportsNativeShare,
   onCopy,
   onShare,
+  onRevoke,
+  isRevoking,
 }: {
   invites: ClubInvite[];
   copiedInviteId: string | null;
   supportsNativeShare: boolean;
   onCopy: (invite: ClubInvite) => void;
   onShare: (invite: ClubInvite) => void;
+  onRevoke: (invite: ClubInvite) => void;
+  isRevoking: boolean;
 }) {
   if (!invites.length) {
     return (
@@ -2350,6 +2375,18 @@ export function InviteList({
                 >
                   {copiedInviteId === invite.inviteId ? <Check className="size-4 text-green-300" /> : <Copy className="size-4" />}
                 </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  title="Revoke invite"
+                  aria-label={`Revoke invite for ${invite.email || "this link"}`}
+                  onClick={() => onRevoke(invite)}
+                  disabled={isRevoking}
+                  className="text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
               </div>
             ) : null}
           </div>
@@ -2365,13 +2402,14 @@ function InviteBadge({ status }: { status: ClubInvite["status"] }) {
     pending: "border-amber-300/20 bg-amber-400/10 text-amber-100",
     accepted: "border-green-300/20 bg-green-400/10 text-green-100",
     expired: "border-rose-300/20 bg-rose-400/10 text-rose-100",
+    revoked: "border-slate-300/20 bg-slate-400/10 text-slate-200",
   };
   return <span className={`rounded border px-2 py-0.5 text-xs capitalize ${classes[status]}`}>{status}</span>;
 }
 
-function MemberList({ members }: { members: ClubMembership[] }) {
+export function MemberList({ members }: { members: ClubMembership[] }) {
   if (!members.length) {
-    return <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">Added users will appear here after the backend creates their club memberships.</p>;
+    return <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">No active members found for this club.</p>;
   }
 
   return (
@@ -2379,10 +2417,10 @@ function MemberList({ members }: { members: ClubMembership[] }) {
       {members.map((member) => (
         <div key={`${member.clubId}-${member.userId}`} className="rounded-lg border border-white/10 bg-white/5 p-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <p className="truncate font-medium text-white">{member.email || member.userId}</p>
+            <p className="truncate font-medium text-white">{member.name || member.email || member.userId}</p>
             <span className="rounded border border-green-300/20 bg-green-400/10 px-2 py-0.5 text-xs capitalize text-green-100">{member.role}</span>
           </div>
-          <p className="mt-1 text-xs text-slate-400">{member.status || "active"} membership</p>
+          <p className="mt-1 text-xs text-slate-400">{member.name && member.email ? member.email : ""}{member.name && member.email ? " · " : ""}{member.status || "active"} membership</p>
         </div>
       ))}
     </div>

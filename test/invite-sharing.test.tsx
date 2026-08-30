@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   InviteList,
+  MemberList,
   inviteShareData,
   shareInviteNatively,
 } from "@/app/clubs/[clubId]/admin/page";
@@ -70,6 +71,7 @@ describe("native invite sharing", () => {
   it("shows Share only when supported and always retains Copy", () => {
     const onShare = vi.fn();
     const onCopy = vi.fn();
+    const onRevoke = vi.fn();
     const { rerender } = render(
       <InviteList
         invites={[invite]}
@@ -77,6 +79,8 @@ describe("native invite sharing", () => {
         supportsNativeShare={false}
         onCopy={onCopy}
         onShare={onShare}
+        onRevoke={onRevoke}
+        isRevoking={false}
       />,
     );
 
@@ -91,10 +95,23 @@ describe("native invite sharing", () => {
         supportsNativeShare
         onCopy={onCopy}
         onShare={onShare}
+        onRevoke={onRevoke}
+        isRevoking={false}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /share invite/i }));
     expect(onShare).toHaveBeenCalledWith(invite);
     expect(screen.getByRole("button", { name: /copy invite link/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /revoke invite/i }));
+    expect(onRevoke).toHaveBeenCalledWith(invite);
+  });
+
+  it("renders current club members and an empty state", () => {
+    const { rerender } = render(<MemberList members={[]} />);
+    expect(screen.getByText(/no active members/i)).toBeInTheDocument();
+
+    rerender(<MemberList members={[{ clubId: "club-1", userId: "user-1", name: "Alex Rivera", email: "alex@example.com", role: "admin", status: "active" }]} />);
+    expect(screen.getByText("Alex Rivera")).toBeInTheDocument();
+    expect(screen.getByText("alex@example.com · active membership")).toBeInTheDocument();
   });
 });
