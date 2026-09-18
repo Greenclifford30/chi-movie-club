@@ -634,14 +634,18 @@ export default function ClubAdminPage() {
     if (!token || !active?.movieNight) {
       return;
     }
-    if (!window.confirm("Confirm this showtime as the final club plan? This cannot be changed from the admin workspace.")) return;
+    const isChangingConfirmedShowtime = active.movieNight.status === "confirmed";
+    const confirmationMessage = isChangingConfirmedShowtime
+      ? "Change the confirmed club plan to this showtime? Members will be notified of the update and may need to update their RSVP."
+      : "Confirm this showtime as the final club plan? Members will be notified and can RSVP or track tickets.";
+    if (!window.confirm(confirmationMessage)) return;
     setConfirmState("saving");
     setError(null);
     setMessage(null);
     try {
       await confirmShowtime(token, active.movieNight.movieNightId, showtimeId);
       setConfirmState("saved");
-      setMessage("Final showtime confirmed. Members can RSVP and track tickets now.");
+      setMessage(isChangingConfirmedShowtime ? "Confirmed showtime updated. Members have been notified of the change." : "Final showtime confirmed. Members can RSVP and track tickets now.");
       await loadActive();
     } catch (confirmError) {
       setConfirmState("error");
@@ -1213,7 +1217,8 @@ export default function ClubAdminPage() {
                 results={results}
                 onConfirm={handleConfirm}
                 isSaving={confirmState === "saving"}
-                canConfirm={Boolean(movieNight && movieNight.status === "voting" && isVotingClosed(movieNight))}
+                canConfirm={Boolean(movieNight && (movieNight.status === "confirmed" || (movieNight.status === "voting" && isVotingClosed(movieNight))))}
+                isChangingConfirmedShowtime={movieNight?.status === "confirmed"}
               />
             </div>
             <div className="order-4"><AttendanceSummaryCard status={movieNight?.status} attendance={attendance} /></div>
@@ -2122,11 +2127,13 @@ function AdminResults({
   onConfirm,
   isSaving,
   canConfirm,
+  isChangingConfirmedShowtime,
 }: {
   results: VoteResults | null;
   onConfirm: (showtimeId: string) => Promise<void>;
   isSaving: boolean;
   canConfirm: boolean;
+  isChangingConfirmedShowtime: boolean;
 }) {
   const winner = results?.standings?.[0];
   const [showtimeToConfirm, setShowtimeToConfirm] = useState<string | null>(null);
@@ -2144,7 +2151,7 @@ function AdminResults({
     <AdminStepCard
       step="Step 4"
       title="Results and confirmation"
-      description={results ? `${results.voteCount} ballots submitted` : "Results appear after voting opens and members rank showtimes."}
+      description={isChangingConfirmedShowtime ? "Choose an approved showtime to correct the confirmed plan." : results ? `${results.voteCount} ballots submitted` : "Results appear after voting opens and members rank showtimes."}
       status={winner ? "current" : "waiting"}
     >
       <div className="space-y-3">
@@ -2160,13 +2167,15 @@ function AdminResults({
             </p>
             {canConfirm ? (
               <StatusAlert tone="warning" className="mt-4">
-                Confirming makes this the final club plan and switches members from voting to RSVP and ticket tracking.
+                {isChangingConfirmedShowtime
+                  ? "Changing the plan notifies members and updates the calendar details."
+                  : "Confirming makes this the final club plan and switches members from voting to RSVP and ticket tracking."}
               </StatusAlert>
             ) : null}
             {canConfirm ? (
               <Button size="sm" onClick={() => onConfirm(winner.showtimeId)} disabled={isSaving} className="mt-4 bg-green-500 text-slate-950 hover:bg-green-400">
                 {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                Confirm leader
+                {isChangingConfirmedShowtime ? "Change to leader" : "Confirm leader"}
               </Button>
             ) : null}
           </div>
@@ -2183,7 +2192,7 @@ function AdminResults({
                 </div>
                 {canConfirm ? (
                   <Button size="sm" variant={index === 0 ? "outline" : "ghost"} onClick={() => onConfirm(standing.showtimeId)} disabled={isSaving} className="shrink-0 border-white/10 text-slate-100 hover:bg-white/10">
-                    Confirm
+                    {isChangingConfirmedShowtime ? "Change" : "Confirm"}
                   </Button>
                 ) : null}
               </div>

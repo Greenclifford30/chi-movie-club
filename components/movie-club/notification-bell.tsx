@@ -2,7 +2,7 @@
 
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { listNotifications, markAllNotificationsRead } from "@/lib/movie-club-api";
 import { useAuth } from "@/lib/auth-context";
@@ -14,11 +14,29 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const loadNotifications = useCallback(async () => {
     if (!token) return;
     setLoading(true);
-    listNotifications(token).then(({ notifications: items }) => setNotifications(items)).catch(() => undefined).finally(() => setLoading(false));
+    try {
+      const { notifications: items } = await listNotifications(token);
+      setNotifications(items);
+    } catch {
+      // Notification availability should not block the rest of the app shell.
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
+
+  useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
+
+  function toggleOpen() {
+    setOpen((wasOpen) => {
+      if (!wasOpen) void loadNotifications();
+      return !wasOpen;
+    });
+  }
 
   const unread = notifications.filter((notification) => !notification.readAt).length;
   async function markAllRead() {
@@ -27,7 +45,7 @@ export function NotificationBell() {
     setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })));
   }
   return <div className="relative">
-    <Button variant="ghost" size="icon" title="Notifications" onClick={() => setOpen((value) => !value)}>
+    <Button variant="ghost" size="icon" title="Notifications" onClick={toggleOpen}>
       <Bell className="size-4" /><span className="sr-only">Notifications</span>
       {unread ? <span className="absolute right-0 top-0 grid size-4 place-items-center rounded-full bg-cyan-400 text-[10px] font-bold text-slate-950">{unread > 9 ? "9+" : unread}</span> : null}
     </Button>
