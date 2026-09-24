@@ -62,7 +62,7 @@ function AuthCallbackContent() {
             <p>{error}</p>
           </div>
         </div>
-        <Button asChild className="mt-5 w-full bg-violet-500 text-white hover:bg-violet-600">
+        <Button asChild className="mt-5 w-full bg-violet-400 text-slate-950 hover:bg-violet-300">
           <Link href="/sign-in">Back to sign in</Link>
         </Button>
       </CallbackShell>
@@ -76,10 +76,10 @@ function CallbackShell({ children, message }: { children?: React.ReactNode; mess
   const hasError = Boolean(children);
 
   return (
-    <main className="grid min-h-screen place-items-center px-4 text-slate-50">
-      <section className="w-full max-w-md rounded-lg border border-white/10 bg-slate-900/85 p-8 shadow-2xl shadow-black/40">
+    <main className="grid min-h-dvh place-items-center px-4 text-slate-50">
+      <section className="w-full max-w-md rounded-xl border border-white/10 bg-[#141b29] p-8">
         <div className="flex items-center gap-3">
-          {hasError ? <AlertCircle className="size-5 text-rose-200" /> : <Loader2 className="size-5 animate-spin text-cyan-300" />}
+          {hasError ? <AlertCircle className="size-5 text-rose-200" /> : <Loader2 className="size-5 animate-spin text-violet-300" />}
           <div>
             <p className="text-sm text-slate-400">Movie Club</p>
             <h1 className="text-xl font-semibold text-white">{message}</h1>

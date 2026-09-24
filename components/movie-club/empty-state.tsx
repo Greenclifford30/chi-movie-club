@@ -18,26 +18,26 @@ export function EmptyState({
   className?: string;
 }) {
   const actionButton = action?.href ? (
-    <Button asChild className="mt-5 bg-violet-500 text-white hover:bg-violet-600">
+    <Button asChild className="mt-5 bg-violet-400 text-slate-950 hover:bg-violet-300">
       <Link href={action.href}>
         {action.label}
         <ArrowRight className="size-4" />
       </Link>
     </Button>
   ) : action?.onClick ? (
-    <Button onClick={action.onClick} className="mt-5 bg-violet-500 text-white hover:bg-violet-600">
+    <Button onClick={action.onClick} className="mt-5 bg-violet-400 text-slate-950 hover:bg-violet-300">
       {action.label}
       <ArrowRight className="size-4" />
     </Button>
   ) : null;
 
   return (
-    <section className={`rounded-lg border border-white/10 bg-slate-900/70 p-6 ${className}`}>
-      <div className="mb-4 flex size-11 items-center justify-center rounded-full bg-violet-400/15 text-violet-100">
+    <section className={`mc-panel p-7 sm:p-9 ${className}`}>
+      <div className="mb-4 flex size-11 items-center justify-center rounded-lg bg-violet-400/10 text-violet-100">
         {icon || <Film className="size-5" />}
       </div>
-      <p className="font-semibold text-white">{title}</p>
-      <p className="mt-2 max-w-2xl text-sm text-slate-300">{description}</p>
+      <h2 className="text-xl font-semibold tracking-tight text-white">{title}</h2>
+      <p className="mt-2 max-w-prose text-sm leading-6 text-slate-300">{description}</p>
       {actionButton}
     </section>
   );

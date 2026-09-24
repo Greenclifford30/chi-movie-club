@@ -38,7 +38,7 @@ export function RankedChoicePicker({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-violet-400/20 bg-violet-500/10 p-3 text-sm text-violet-50">
+      <div className="border-l-2 border-violet-300/60 pl-3 text-sm text-slate-300">
         Pick up to three different showtimes. You can edit your saved vote while voting is open.
       </div>
       {rankLabels.map((rank, index) => {
@@ -69,13 +69,13 @@ export function RankedChoicePicker({
         <ol className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
           {selectedShowtimes.map((showtime, index) => (
             <li key={showtime.showtimeId} className="flex gap-2 py-1">
-              <span className="text-cyan-300">{index + 1}.</span>
+              <span className="text-violet-300">{index + 1}.</span>
               <span>{showtimeLabel(showtime)}</span>
             </li>
           ))}
         </ol>
       ) : null}
-      <Button className={`${hideMobileSave ? "hidden md:flex" : ""} w-full bg-violet-500 text-white hover:bg-violet-600`} disabled={disabled || !selectedCount || isSaving} onClick={onSave}>
+      <Button className={`${hideMobileSave ? "hidden md:flex" : ""} w-full bg-violet-400 text-slate-950 hover:bg-violet-300`} disabled={disabled || !selectedCount || isSaving} onClick={onSave}>
         {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}
         {hasSavedVote ? "Update ranked vote" : "Save ranked vote"}
       </Button>

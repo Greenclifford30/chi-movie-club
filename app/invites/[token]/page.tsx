@@ -94,14 +94,14 @@ export default function InvitePage() {
 
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-4 text-slate-50 sm:py-10">
-      <section className="w-full max-w-2xl rounded-lg border border-white/10 bg-slate-900/85 p-5 shadow-2xl shadow-black/40 sm:p-8">
+      <section className="w-full max-w-2xl rounded-xl border border-white/10 bg-[#141b29] p-5 sm:p-8">
         <div className="mb-8 flex items-center gap-2 font-semibold text-white">
           <Film className="size-6" />
           <span>Movie Club</span>
         </div>
 
         {isLoading ? (
-          <Status icon={<Loader2 className="size-6 animate-spin text-cyan-300" />} title="Loading invite">
+          <Status icon={<Loader2 className="size-6 animate-spin text-violet-300" />} title="Loading invite">
             Checking the invite link.
           </Status>
         ) : error && !invite ? (
@@ -111,11 +111,11 @@ export default function InvitePage() {
         ) : invite ? (
           <div>
             <div className="mb-6">
-              <p className="mb-2 flex items-center gap-2 text-sm text-cyan-300">
+              <p className="mb-2 flex items-center gap-2 text-sm text-violet-300">
                 <Ticket className="size-4" />
                 Club invite
               </p>
-              <h1 className="text-3xl font-semibold tracking-tight text-white">
+              <h1 className="text-3xl font-semibold tracking-[-.04em] text-white">
                 Join {invite.clubName || "this movie club"}
               </h1>
               <p className="mt-3 text-slate-300">
@@ -127,13 +127,13 @@ export default function InvitePage() {
 
             {!isAuthenticated ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                <Button asChild className="bg-violet-500 text-white hover:bg-violet-600">
+                <Button asChild className="bg-violet-400 text-slate-950 hover:bg-violet-300">
                   <Link href={`/sign-in?redirect=${encodeURIComponent(redirectPath)}`}>
                     <CheckCircle2 className="size-4" />
                     Sign in
                   </Link>
                 </Button>
-                <Button asChild className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+                <Button asChild className="bg-violet-400 text-slate-950 hover:bg-violet-300">
                   <Link href={`/sign-up?redirect=${encodeURIComponent(redirectPath)}`}>
                     <UserPlus className="size-4" />
                     Sign up
@@ -156,7 +156,7 @@ export default function InvitePage() {
                       setAcceptState("idle");
                       setAcceptAttempt((attempt) => attempt + 1);
                     }}
-                    className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                    className="bg-violet-400 text-slate-950 hover:bg-violet-300"
                   >
                     Try again
                   </Button>

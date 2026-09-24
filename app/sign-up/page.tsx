@@ -95,7 +95,7 @@ function SignUpContent() {
               />
             </div>
             {error ? <Alert>{error}</Alert> : null}
-            <Button type="submit" disabled={isSubmitting || !code.trim()} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+            <Button type="submit" disabled={isSubmitting || !code.trim()} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300">
               {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
               Confirm and continue
             </Button>
@@ -149,13 +149,13 @@ function SignUpContent() {
               Email
               <span className="h-px flex-1 bg-white/10" />
             </div>
-            <Button type="submit" disabled={isSubmitting} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+            <Button type="submit" disabled={isSubmitting} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300">
               {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
               Sign up
             </Button>
             <p className="text-center text-sm text-slate-400">
               Already have an account?{" "}
-              <Link href={`/sign-in?redirect=${encodeURIComponent(redirect)}`} className="font-medium text-cyan-200 hover:text-cyan-100">
+              <Link href={`/sign-in?redirect=${encodeURIComponent(redirect)}`} className="font-medium text-violet-200 hover:text-violet-100">
                 Sign in
               </Link>
             </p>
@@ -169,15 +169,15 @@ function SignUpContent() {
 function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-4 text-slate-50 sm:py-10">
-      <section className="grid w-full max-w-5xl overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 shadow-2xl shadow-black/40 md:grid-cols-[1.05fr_0.95fr]">
-        <div className="flex flex-col justify-between bg-[linear-gradient(145deg,rgba(139,92,246,0.22),rgba(34,211,238,0.08))] p-5 md:min-h-[520px] md:p-8">
+      <section className="grid w-full max-w-5xl overflow-hidden rounded-xl border border-white/10 bg-[#141b29] md:grid-cols-[1.05fr_0.95fr]">
+        <div className="flex flex-col justify-between bg-[radial-gradient(circle_at_20%_20%,rgba(167,139,250,0.16),transparent_38%),linear-gradient(150deg,#192033,#101827)] p-5 md:min-h-[520px] md:p-8">
           <div className="flex items-center gap-2 font-semibold">
             <Film className="size-6" />
             <span>Movie Club</span>
           </div>
           <div className="hidden md:block">
             <p className="mb-3 text-sm font-medium text-cyan-200">Invited screening</p>
-            <h1 className="max-w-md text-4xl font-semibold tracking-tight text-white md:text-5xl">
+            <h1 className="max-w-md text-4xl font-semibold leading-tight tracking-[-.045em] text-white md:text-5xl">
               Create an account to join your club.
             </h1>
             <p className="mt-4 max-w-md text-slate-300">
@@ -193,9 +193,9 @@ function AuthShell({ children }: { children: React.ReactNode }) {
 
 function AuthShellFallback() {
   return (
-    <main className="grid min-h-screen place-items-center text-slate-200">
+    <main className="grid min-h-dvh place-items-center text-slate-200">
       <div className="flex items-center gap-3">
-        <Loader2 className="size-5 animate-spin text-cyan-300" />
+        <Loader2 className="size-5 animate-spin text-violet-300" />
         Loading...
       </div>
     </main>

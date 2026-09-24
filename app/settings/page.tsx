@@ -3,6 +3,7 @@
 import { BellRing, Check, Loader2, MapPin, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/movie-club/app-shell";
+import { PageSkeleton } from "@/components/movie-club/page-skeleton";
 import {
   DEFAULT_PLANNING_RADIUS,
   DEFAULT_PLANNING_ZIP,
@@ -128,22 +129,22 @@ export default function SettingsPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mc-page mc-page-narrow">
         <div className="mb-6">
           <div className="mb-2 flex items-center gap-2 text-sm text-cyan-300"><Settings className="size-4" />Account settings</div>
-          <h1 className="text-2xl font-semibold text-white sm:text-3xl">Planning defaults</h1>
+          <h1 className="mc-title">Planning defaults</h1>
           <p className="mt-2 text-slate-300">Set reusable starting values for every club you administer.</p>
         </div>
         {error ? <StatusAlert tone="danger" className="mb-4">{error}</StatusAlert> : null}
         {message ? <StatusAlert tone="success" className="mb-4">{message}</StatusAlert> : null}
-        <Card className="border-white/10 bg-slate-900/80 py-6">
+        <Card className="border-white/10 bg-[#141b29] py-6">
           <CardHeader>
             <div className="flex items-center gap-2"><MapPin className="size-5 text-violet-300" /><h2 className="font-semibold text-white">Showtime search</h2></div>
             <p className="text-sm text-slate-400">Signed in as {email || "your account"}. Existing movie nights keep their saved criteria.</p>
           </CardHeader>
           <CardContent className="space-y-6">
             {isLoading ? (
-              <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 className="size-4 animate-spin" />Loading preferences...</div>
+              <PageSkeleton variant="form" label="Loading planning defaults" />
             ) : (
               <PlanningPreferencesFields
                 zipCode={preferences.defaultZipCode}
@@ -154,7 +155,7 @@ export default function SettingsPage() {
                 onPreferredFormatsChange={(preferredFormats) => setPreferences((current) => ({ ...current, preferredFormats }))}
               />
             )}
-            <Button onClick={handleSave} disabled={isLoading || isSaving} className="w-full bg-violet-500 text-white hover:bg-violet-600 sm:w-auto">
+            <Button onClick={handleSave} disabled={isLoading || isSaving} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300 sm:w-auto">
               {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Save defaults
             </Button>
             <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-slate-300">

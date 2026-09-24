@@ -18,14 +18,14 @@ export function ConfirmedPlanCard({
   const dateTime = showtimeDateTime(showtime);
 
   return (
-    <section className="rounded-lg border border-green-400/30 bg-green-500/10 p-5 shadow-2xl shadow-green-950/20">
-      <p className="mb-4 flex items-center gap-2 text-sm font-semibold text-green-100">
+    <section className="rounded-xl border border-green-400/20 bg-[#142128] p-6">
+      <p className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[.13em] text-green-200">
         <CheckCircle2 className="size-5" />
         Confirmed final plan
       </p>
       <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{showtime.theaterName}</h2>
+          <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{showtime.theaterName}</h2>
           {showtime.theaterLocation ? (
             <p className="mt-2 flex items-center gap-2 text-sm text-slate-300">
               <MapPin className="size-4 text-cyan-200" />
@@ -40,7 +40,7 @@ export function ConfirmedPlanCard({
         </div>
         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:flex-wrap md:justify-end">
           {showtime.ticketURI ? (
-            <Button asChild className="w-full bg-green-500 text-slate-950 hover:bg-green-400 md:w-auto">
+            <Button asChild className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300 md:w-auto">
               <a href={showtime.ticketURI} target="_blank" rel="noreferrer">
                 <ExternalLink className="size-4" />
                 Buy tickets
@@ -48,7 +48,7 @@ export function ConfirmedPlanCard({
             </Button>
           ) : null}
           {secondaryAction}
-          {onPrimaryAction ? <Button onClick={onPrimaryAction} className="bg-green-500 text-slate-950 hover:bg-green-400">RSVP and ticket</Button> : null}
+          {onPrimaryAction ? <Button onClick={onPrimaryAction} className="bg-violet-400 text-slate-950 hover:bg-violet-300">RSVP and ticket</Button> : null}
         </div>
       </div>
     </section>
@@ -57,8 +57,8 @@ export function ConfirmedPlanCard({
 
 function PlanStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-      <div className="mb-3">{icon}</div>
+    <div className="border-l border-white/10 pl-4">
+      <div className="mb-2">{icon}</div>
       <p className="text-sm text-slate-400">{label}</p>
       <p className="mt-1 font-semibold text-white">{value}</p>
     </div>

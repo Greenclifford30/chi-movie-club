@@ -73,7 +73,7 @@ export function PlanningPreferencesFields({
               key={format}
               value={format}
               disabled={disabled}
-              className="border-white/10 bg-white/5 text-slate-200 data-[state=on]:bg-violet-500"
+              className="border-white/10 bg-white/5 text-slate-200 data-[state=on]:bg-violet-400 data-[state=on]:text-slate-950"
             >
               {format}
             </ToggleGroupItem>

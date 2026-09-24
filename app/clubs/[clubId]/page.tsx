@@ -9,6 +9,7 @@ import { AddToCalendarButton } from "@/components/movie-club/add-to-calendar-but
 import { AppShell } from "@/components/movie-club/app-shell";
 import { ConfirmedPlanCard } from "@/components/movie-club/confirmed-plan-card";
 import { EmptyState } from "@/components/movie-club/empty-state";
+import { PageSkeleton } from "@/components/movie-club/page-skeleton";
 import { RankedChoicePicker } from "@/components/movie-club/ranked-choice-picker";
 import { ShowtimeCard } from "@/components/movie-club/showtime-card";
 import { StatusAlert } from "@/components/movie-club/status-alert";
@@ -168,14 +169,9 @@ export default function ActiveClubPage() {
 
   return (
     <AppShell>
-      <div className={`mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 ${isVoting || isConfirmed ? "pb-28 sm:pb-28 md:pb-6" : ""}`}>
+      <div className={`mc-page ${isVoting || isConfirmed ? "pb-28 sm:pb-28 md:pb-6" : ""}`}>
         {isLoading || isRedirecting ? (
-          <section className="grid min-h-[520px] place-items-center rounded-lg border border-white/10 bg-slate-900/70">
-            <div className="flex flex-col items-center gap-3 text-slate-300">
-              <Loader2 className="size-8 animate-spin text-cyan-300" />
-              <p>{isRedirecting ? "Opening club history..." : "Loading the active movie night..."}</p>
-            </div>
-          </section>
+          <PageSkeleton variant="movie" label={isRedirecting ? "Opening club history" : "Loading the active movie night"} />
         ) : error && !data ? (
           <EmptyState
             title="Movie night could not load"
@@ -204,7 +200,7 @@ export default function ActiveClubPage() {
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
               <div className="contents">
-                <div id="details" className={`${isConfirmed ? "order-3" : "order-1"} scroll-mt-20 overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 shadow-2xl shadow-black/30 lg:order-none lg:col-span-8`}>
+                <div id="details" className={`${isConfirmed ? "order-3" : "order-1"} scroll-mt-20 overflow-hidden rounded-xl border border-white/10 bg-[#141b29] lg:order-none lg:col-span-8`}>
                   <div className="grid grid-cols-1 md:grid-cols-[260px_1fr]">
                     <div className="relative h-64 bg-slate-950 sm:h-80 md:h-auto md:min-h-[390px]">
                       {imageUrl ? (
@@ -217,17 +213,17 @@ export default function ActiveClubPage() {
                     </div>
                     <div className="p-6 md:p-8">
                       <div className="mb-4 flex flex-wrap items-center gap-2">
-                        <span className="rounded bg-violet-400/15 px-2 py-1 text-xs font-medium text-violet-100">{movieNight.status}</span>
-                        <span className="rounded bg-cyan-400/10 px-2 py-1 text-xs font-medium text-cyan-100">{movie.releaseYear || "Release year TBD"}</span>
+                        <span className="rounded-sm bg-violet-400/15 px-2 py-1 text-xs font-medium text-violet-100">{movieNight.status}</span>
+                        <span className="rounded-sm bg-white/10 px-2 py-1 text-xs font-medium text-slate-200">{movie.releaseYear || "Release year TBD"}</span>
                       </div>
-                      <h1 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl md:text-5xl">{movie.title}</h1>
+                      <h1 className="text-balance text-4xl font-semibold leading-tight tracking-[-.045em] text-white sm:text-5xl">{movie.title}</h1>
                       <div className="mt-4 flex flex-wrap gap-2 text-sm text-slate-300">
                         {movie.runtime ? <span className="rounded border border-white/10 bg-white/5 px-2 py-1">{movie.runtime} min</span> : null}
                         {movie.genres?.filter((genre): genre is string => typeof genre === "string").slice(0, 3).map((genre) => <span key={genre} className="rounded border border-white/10 bg-white/5 px-2 py-1">{genre}</span>)}
                         {movie.rating ? <span className="rounded border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-amber-100">★ {movie.rating.toFixed(1)}</span> : null}
                       </div>
                       <p className="mt-4 max-w-2xl text-pretty leading-7 text-slate-300">{movie.overview || "Movie details will appear here once the admin saves a full movie snapshot."}</p>
-                      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                      <div className="mt-7 grid gap-4 border-t border-white/10 pt-5 sm:grid-cols-3">
                         <Stat icon={<CalendarDays className="size-5 text-amber-300" />} label="Target" value={formatDate(movieNight.targetDate)} />
                         <Stat icon={<Ticket className="size-5 text-cyan-300" />} label="Options" value={`${data.showtimes.length} showtimes`} />
                         <Stat icon={<Users className="size-5 text-violet-300" />} label="Mode" value={movieNight.movieSelectionMode || "admin_selected"} />
@@ -291,7 +287,7 @@ export default function ActiveClubPage() {
 
               <aside className="order-2 space-y-6 lg:order-none lg:col-span-4 lg:col-start-9 lg:row-span-3 lg:row-start-1">
                 {isConfirmed ? (
-                  <Card id="rsvp" className="sticky top-24 border-green-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-black/20">
+                  <Card id="rsvp" className="sticky top-24 border-white/10 bg-[#171f2c] py-6">
                     <CardHeader>
                       <h2 className="font-semibold text-white">RSVP and tickets</h2>
                       <p className="text-sm text-slate-400">One update records both your attendance and ticket status.</p>
@@ -299,17 +295,17 @@ export default function ActiveClubPage() {
                     <CardContent className="space-y-4">
                       <Segmented label="RSVP" value={rsvpStatus} onChange={(value) => setRsvpStatus(value as RsvpStatus)} options={[["going", "Going"], ["maybe", "Maybe"], ["not_going", "Not going"]]} />
                       <Segmented label="Ticket" value={ticketStatus} onChange={(value) => setTicketStatus(value as TicketStatus)} options={[["not_purchased", "Not purchased"], ["purchased", "Purchased"]]} />
-                      <Button onClick={saveRsvp} disabled={isSaving} className="hidden w-full bg-violet-500 text-white hover:bg-violet-600 md:flex">
+                      <Button onClick={saveRsvp} disabled={isSaving} className="hidden w-full bg-violet-400 text-slate-950 hover:bg-violet-300 md:flex">
                         {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                         Update RSVP
                       </Button>
                     </CardContent>
                   </Card>
                 ) : (
-                  <Card id="vote" className="sticky top-24 border-violet-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-violet-950/20">
+                  <Card id="vote" className="sticky top-24 border-white/10 bg-[#171f2c] py-6">
                     <CardHeader>
                       <div className="flex items-center gap-3">
-                        <div className="rounded-full bg-violet-400/20 p-2 text-violet-200">
+                        <div className="rounded-md bg-violet-400/15 p-2 text-violet-200">
                           <Vote className="size-5" />
                         </div>
                         <div>
@@ -346,14 +342,14 @@ export default function ActiveClubPage() {
             </div>
             {isVoting && hasShowtimes ? (
               <div className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 border-t border-white/10 bg-slate-950/95 p-3 backdrop-blur-xl md:hidden">
-                <Button className="mx-auto flex w-full max-w-lg bg-violet-500 text-white hover:bg-violet-600" disabled={!rankings.some(Boolean) || isSaving} onClick={saveVote}>
+                <Button className="mx-auto flex w-full max-w-lg bg-violet-400 text-slate-950 hover:bg-violet-300" disabled={!rankings.some(Boolean) || isSaving} onClick={saveVote}>
                   {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}
                   {hasSavedVote ? "Update ranked vote" : "Save ranked vote"}
                 </Button>
               </div>
             ) : isConfirmed ? (
               <div className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 border-t border-white/10 bg-slate-950/95 p-3 backdrop-blur-xl md:hidden">
-                <Button onClick={saveRsvp} disabled={isSaving} className="mx-auto flex w-full max-w-lg bg-violet-500 text-white hover:bg-violet-600">
+                <Button onClick={saveRsvp} disabled={isSaving} className="mx-auto flex w-full max-w-lg bg-violet-400 text-slate-950 hover:bg-violet-300">
                   {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                   Update RSVP
                 </Button>
@@ -368,8 +364,8 @@ export default function ActiveClubPage() {
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-      <div className="mb-3">{icon}</div>
+    <div className="border-l border-white/10 pl-4">
+      <div className="mb-2">{icon}</div>
       <p className="text-sm text-slate-400">{label}</p>
       <p className="mt-1 font-semibold text-white">{value}</p>
     </div>
@@ -397,9 +393,9 @@ function Segmented({
             type="button"
             onClick={() => onChange(optionValue)}
             aria-pressed={value === optionValue}
-            className={`min-h-11 rounded-lg border px-3 py-2 text-left text-sm transition focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            className={`min-h-11 rounded-lg border px-3 py-2 text-left text-sm transition focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               value === optionValue
-                ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100"
+                ? "border-violet-300/50 bg-violet-300/10 text-violet-100"
                 : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
             }`}
           >

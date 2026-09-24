@@ -27,6 +27,8 @@ import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AdminStepCard } from "@/components/movie-club/admin-step-card";
 import { AppShell } from "@/components/movie-club/app-shell";
+import { AdminSectionNav, type AdminSection } from "@/components/movie-club/admin-section-nav";
+import { PageSkeleton } from "@/components/movie-club/page-skeleton";
 import { ConfirmedPlanCard } from "@/components/movie-club/confirmed-plan-card";
 import { EmptyState } from "@/components/movie-club/empty-state";
 import { ShowtimeCard } from "@/components/movie-club/showtime-card";
@@ -167,6 +169,7 @@ export default function ClubAdminPage() {
   const [completeState, setCompleteState] = useState<ActionState>("idle");
   const [cancelState, setCancelState] = useState<ActionState>("idle");
   const [testNotificationState, setTestNotificationState] = useState<ActionState>("idle");
+  const [activeSection, setActiveSection] = useState<AdminSection>("setup");
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [supportsNativeShare, setSupportsNativeShare] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -878,7 +881,6 @@ export default function ClubAdminPage() {
     [cachedShowtimes, selectedShowtimeDate, showtimeTimeBucket]
   );
   const selectedPoster = selectedMovie ? posterUrl(selectedMovie) : "";
-  const groupedCurrentShowtimes = groupShowtimesByTheater(currentShowtimes, showtimeDateTime);
   const hasCompletedPointer = movieNight?.status === "completed";
   const canEditSetup = !movieNight || hasCompletedPointer || movieNight.status === "planning";
   const canCreate = Boolean(selectedMovie && targetDate && createState !== "saving" && canEditSetup);
@@ -906,19 +908,25 @@ export default function ClubAdminPage() {
     resultCount: results?.standings?.length || 0,
   });
 
+  useEffect(() => {
+    if (isWorkspaceLoading) return;
+    if (movieNight?.status === "confirmed" || movieNight?.status === "voting" || (movieNight?.status === "planning" && approvedCandidates.length >= 2)) setActiveSection("voting");
+    else if (approvedCandidates.length || movieNight) setActiveSection("showtimes");
+  // The opening section is chosen once after the initial workspace load.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWorkspaceLoading]);
+
   if (isWorkspaceLoading) {
     return (
       <AppShell>
-        <div className="grid min-h-[60vh] place-items-center text-slate-300">
-          <div className="flex items-center gap-3"><Loader2 className="size-5 animate-spin text-cyan-300" />Loading admin workspace...</div>
-        </div>
+        <div className="mc-page"><PageSkeleton variant="admin" label="Loading admin workspace" /></div>
       </AppShell>
     );
   }
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mc-page">
         <section className="mb-6 border-b border-white/10 pb-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -926,36 +934,29 @@ export default function ClubAdminPage() {
                 <CalendarClock className="size-4" />
                 <span>Club admin workspace</span>
               </div>
-              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Manage movie night</h1>
-              <p className="mt-2 max-w-2xl text-slate-300">{nextAction}</p>
+              <h1 className="mc-title">Manage movie night</h1>
+              <p className="mt-3 max-w-xl text-base leading-relaxed text-slate-300">{nextAction}</p>
               <p className="mt-3 text-xs text-slate-500">
                 {movieNight?.updatedAt ? `Last updated ${formatDate(movieNight.updatedAt)}` : "No active movie night yet"}
               </p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[32rem]">
+            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[26rem]">
               <Metric label="Status" value={statusLabel} tone={statusTone(movieNight?.status)} />
-              <Metric label="Selected movie" value={movieNight?.movie.title || selectedMovie?.title || "Choose a movie"} />
-              <Metric label="Target date" value={formatDate(movieNight?.targetDate || targetDate)} />
+              <Metric label="Movie" value={movieNight?.movie.title || selectedMovie?.title || "Choose a movie"} />
+              <Metric label="Date" value={formatDate(movieNight?.targetDate || targetDate)} />
               <Metric label="Showtimes" value={`${candidateCounts.approved} approved`} />
-              <Metric label="Theaters" value={`${groupedCurrentShowtimes.length} listed`} />
-              <Metric label="Ballots" value={results ? `${results.voteCount} submitted` : "Not open yet"} />
-              <Metric label="Voting closes" value={movieNight?.votingClosesAt ? formatDate(movieNight.votingClosesAt) : "Backend controlled"} />
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button type="button" variant="outline" onClick={handleTestNotification} disabled={testNotificationState === "saving"} className="border-cyan-400/40 text-cyan-200 hover:bg-cyan-400/10">
-              {testNotificationState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}Send test notification
-            </Button>
-            <p className="text-xs text-slate-400">Sends a real test only to your admin account through the activity inbox, email, and enabled browser push.</p>
-          </div>
+
         </section>
 
         <ProgressStrip completedCount={completedProgress} />
+        <AdminSectionNav active={activeSection} onChange={setActiveSection} />
 
         {error ? <StatusAlert tone="danger" className="mb-4">{error}</StatusAlert> : null}
         {message ? <StatusAlert tone="success" className="mb-4">{message}</StatusAlert> : null}
 
-        <div className="mb-6 grid gap-6 lg:grid-cols-12 lg:items-start">
+        <div className={activeSection === "setup" ? "mb-6 grid gap-6 lg:grid-cols-12 lg:items-start" : "hidden"}>
         <AdminStepCard
           step="Step 1"
           title="Movie"
@@ -987,7 +988,7 @@ export default function ClubAdminPage() {
               <p className="mt-1 text-sm text-slate-400">Use search when a title is missing from the current theatrical lists.</p>
               <form onSubmit={handleSearch} className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
                 <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by movie title" className="border-white/10 bg-white/5 text-white" />
-                <Button type="submit" disabled={movieSearchState === "saving" || searchQuery.trim().length < 2} className="bg-violet-500 text-white hover:bg-violet-600">
+                <Button type="submit" disabled={movieSearchState === "saving" || searchQuery.trim().length < 2} className="bg-violet-400 text-slate-950 hover:bg-violet-300">
                   {movieSearchState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
                   Search movies
                 </Button>
@@ -1000,7 +1001,7 @@ export default function ClubAdminPage() {
             </div>
         </AdminStepCard>
 
-        <Card className="border-violet-400/20 bg-slate-900/90 py-6 shadow-2xl shadow-violet-950/20 lg:col-span-4">
+        <Card className="border-violet-400/20 bg-slate-900/90 py-6  lg:col-span-4">
           <CardHeader>
             <h2 className="font-semibold text-white">Movie night setup</h2>
             <p className="text-sm text-slate-400">{setupDescription}</p>
@@ -1044,7 +1045,7 @@ export default function ClubAdminPage() {
                 className="border-white/10 bg-white/5 text-white"
               />
             </Field>
-            <Button onClick={handleCreateMovieNight} disabled={!canCreate} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+            <Button onClick={handleCreateMovieNight} disabled={!canCreate} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300">
               {createState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
               {createButtonLabel}
             </Button>
@@ -1053,7 +1054,8 @@ export default function ClubAdminPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <section className="space-y-6 lg:col-span-8">
+          <section className={activeSection === "setup" || activeSection === "showtimes" ? "space-y-6 lg:col-span-12" : "hidden"}>
+            {activeSection === "setup" ? (
             <PlanningPanel
               form={planningForm}
               hasMovieNight={Boolean(movieNight)}
@@ -1065,7 +1067,9 @@ export default function ClubAdminPage() {
               validationError={planningValidationError}
               usesAccountDefaults={usesAccountDefaults && !movieNight}
             />
+            ) : null}
 
+            {activeSection === "showtimes" ? (<>
             <CandidateShowtimesPanel
               counts={candidateCounts}
               filters={{
@@ -1120,11 +1124,12 @@ export default function ClubAdminPage() {
             ) : null}
 
             <AdminShowtimes showtimes={approvedCandidates} />
+            </>) : null}
           </section>
 
-          <aside className="flex flex-col gap-6 lg:col-span-4">
+          <aside className={activeSection === "voting" || activeSection === "people" ? "grid gap-6 lg:col-span-12 lg:grid-cols-2 lg:items-start" : "hidden"}>
             {movieNight?.status === "confirmed" ? (
-              <Card className="order-5 border-green-400/20 bg-slate-900/80 py-6 shadow-2xl shadow-green-950/10">
+              <Card className={`${activeSection === "voting" ? "" : "hidden"} border-green-400/20 bg-slate-900/80 py-6 `}>
                 <CardHeader>
                   <h2 className="font-semibold text-white">End event</h2>
                   <p className="text-sm text-slate-400">
@@ -1147,7 +1152,7 @@ export default function ClubAdminPage() {
                     type="button"
                     onClick={handleCompleteMovieNight}
                     disabled={!canComplete || completeState === "saving"}
-                    className="w-full bg-green-500 text-slate-950 hover:bg-green-400"
+                    className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300"
                   >
                     {completeState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                     End event
@@ -1161,7 +1166,7 @@ export default function ClubAdminPage() {
               </Card>
             ) : null}
 
-            <Card className="order-6 border-white/10 bg-slate-900/80 py-6">
+            <Card className={`${activeSection === "people" ? "" : "hidden"} border-white/10 bg-slate-900/80 py-6`}>
               <CardHeader>
                 <h2 className="font-semibold text-white">Club invites</h2>
                 <p className="text-sm text-slate-400">Send a reusable link from Messages, or create an email-specific invite below.</p>
@@ -1171,7 +1176,7 @@ export default function ClubAdminPage() {
                   type="button"
                   onClick={handleCreateShareableInvite}
                   disabled={shareInviteState === "saving"}
-                  className="w-full bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                  className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300"
                 >
                   {shareInviteState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Share2 className="size-4" />}
                   Invite via Messages
@@ -1186,7 +1191,7 @@ export default function ClubAdminPage() {
                       className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-base text-white outline-none transition placeholder:text-slate-500 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
                     />
                   </Field>
-                  <Button type="submit" disabled={inviteState === "saving" || !inviteEmails.trim()} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+                  <Button type="submit" disabled={inviteState === "saving" || !inviteEmails.trim()} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300">
                     {inviteState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <MailPlus className="size-4" />}
                     Create invites
                   </Button>
@@ -1215,7 +1220,18 @@ export default function ClubAdminPage() {
               </CardContent>
             </Card>
 
-            <Card className="order-7 border-white/10 bg-slate-900/80 py-6">
+            {activeSection === "people" ? (
+              <div className="mc-panel p-5 lg:col-span-2">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" onClick={handleTestNotification} disabled={testNotificationState === "saving"} className="border-cyan-400/40 text-cyan-200 hover:bg-cyan-400/10">
+              {testNotificationState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}Send test notification
+            </Button>
+            <p className="text-xs text-slate-400">Sends a real test only to your admin account through the activity inbox, email, and enabled browser push.</p>
+          </div>
+              </div>
+            ) : null}
+
+            <Card className={`${activeSection === "people" ? "" : "hidden"} border-white/10 bg-slate-900/80 py-6`}>
               <CardHeader>
                 <h2 className="font-semibold text-white">Club members</h2>
                 <p className="text-sm text-slate-400">Current active users in this club.</p>
@@ -1224,9 +1240,9 @@ export default function ClubAdminPage() {
             </Card>
 
             {movieNight?.status === "confirmed" && movieNight.confirmedShowtime ? (
-              <div className="order-3"><ConfirmedPlanCard showtime={movieNight.confirmedShowtime} /></div>
+              <div className={activeSection === "voting" ? "" : "hidden"}><ConfirmedPlanCard showtime={movieNight.confirmedShowtime} /></div>
             ) : null}
-            <div className="order-1">
+            <div className={activeSection === "voting" ? "" : "hidden"}>
               <VotingControlCard
                 movieNight={movieNight}
                 showtimeCount={approvedCandidates.length}
@@ -1238,7 +1254,7 @@ export default function ClubAdminPage() {
                 onOpenVoting={handleOpenVoting}
               />
             </div>
-            <div className="order-2">
+            <div className={activeSection === "voting" ? "" : "hidden"}>
               <AdminResults
                 results={results}
                 onConfirm={handleConfirm}
@@ -1247,7 +1263,7 @@ export default function ClubAdminPage() {
                 isChangingConfirmedShowtime={movieNight?.status === "confirmed"}
               />
             </div>
-            <div className="order-4"><AttendanceSummaryCard status={movieNight?.status} attendance={attendance} /></div>
+            <div className={activeSection === "voting" ? "" : "hidden"}><AttendanceSummaryCard status={movieNight?.status} attendance={attendance} /></div>
           </aside>
         </div>
       </div>
@@ -1257,31 +1273,13 @@ export default function ClubAdminPage() {
 
 function ProgressStrip({ completedCount }: { completedCount: number }) {
   return (
-    <section aria-label="Movie night progress" className="mb-6 flex snap-x gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-6 lg:overflow-visible lg:pb-0">
-      {progressSteps.map((step, index) => {
-        const Icon = step.icon;
-        const isDone = index < completedCount;
-        const isCurrent = index === completedCount;
-        return (
-          <div
-            key={step.label}
-            className={`min-w-40 snap-start rounded-lg border p-4 transition lg:min-w-0 ${
-              isDone
-                ? "border-green-400/30 bg-green-500/10 text-green-100"
-                : isCurrent
-                  ? "border-cyan-300/40 bg-cyan-400/10 text-cyan-100"
-                  : "border-white/10 bg-slate-900/60 text-slate-400"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <Icon className="size-5" />
-              <span className="font-mono text-xs opacity-70">0{index + 1}</span>
-            </div>
-            <p className="mt-4 font-semibold">{step.label}</p>
-            <p className="mt-1 text-xs opacity-75">{isDone ? "Complete" : isCurrent ? "Next up" : "Waiting"}</p>
-          </div>
-        );
-      })}
+    <section aria-label="Movie night progress" className="mb-5 flex gap-1.5 overflow-x-auto pb-1">
+      {progressSteps.map((step, index) => (
+        <div key={step.label} className="min-w-28 flex-1">
+          <div className={`h-1 rounded-full ${index < completedCount ? "bg-violet-400" : index === completedCount ? "bg-violet-300/50" : "bg-white/10"}`} />
+          <p className={`mt-2 text-xs font-medium ${index === completedCount ? "text-white" : "text-slate-500"}`}>{step.label}</p>
+        </div>
+      ))}
     </section>
   );
 }
@@ -1410,7 +1408,7 @@ function PlanningPanel({
           <Field label="Timezone">
             <Input value={form.timezone || "America/Chicago"} onChange={(event) => onChange({ ...form, timezone: event.target.value })} className="border-white/10 bg-white/5 text-white" />
           </Field>
-          <Button onClick={onSave} disabled={!canEdit || isSaving || Boolean(validationError)} className="bg-violet-500 text-white hover:bg-violet-600">
+          <Button onClick={onSave} disabled={!canEdit || isSaving || Boolean(validationError)} className="bg-violet-400 text-slate-950 hover:bg-violet-300">
             {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
             Save planning
           </Button>
@@ -1487,7 +1485,7 @@ function CandidateShowtimesPanel({
                 Uses {movieNight?.dateWindowStart || "start TBD"} through {movieNight?.dateWindowEnd || "end TBD"} near {movieNight?.zipCode || "ZIP TBD"}.
               </p>
             </div>
-            <Button onClick={onImport} disabled={!movieNight || importState === "saving" || importInProgress || hasUnsavedPlanning} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+            <Button onClick={onImport} disabled={!movieNight || importState === "saving" || importInProgress || hasUnsavedPlanning} className="bg-violet-400 text-slate-950 hover:bg-violet-300">
               {importState === "saving" || importInProgress ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
               {importInProgress ? "Import in progress" : "Import showtimes"}
             </Button>
@@ -1534,7 +1532,7 @@ function CandidateShowtimesPanel({
 
             <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm text-slate-300">{visibleShowtimes.length} visible / {selectedIds.length} selected</span>
-              <Button type="button" size="sm" onClick={onBulkApprove} disabled={!selectedIds.length || isCandidateSaving} className="bg-green-500 text-slate-950 hover:bg-green-400">
+              <Button type="button" size="sm" onClick={onBulkApprove} disabled={!selectedIds.length || isCandidateSaving} className="bg-violet-400 text-slate-950 hover:bg-violet-300">
                 {isCandidateSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
                 Approve selected
               </Button>
@@ -1655,7 +1653,7 @@ function GracenoteImportPanel({
   const allVisibleSelected = Boolean(visibleShowtimes.length) && visibleSelectedCount === visibleShowtimes.length;
 
   return (
-    <section className="rounded-lg border border-amber-300/20 bg-slate-900/80 p-5 shadow-2xl shadow-black/20">
+    <section className="rounded-lg border border-amber-300/20 bg-slate-900/80 p-5 ">
       <div className="space-y-5">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-amber-200">Showtime recovery</p>
@@ -1774,7 +1772,7 @@ function GracenoteImportPanel({
                 No cached showtimes match these date and time filters. Adjust the filters above to show more options.
               </p>
             )}
-            <Button onClick={onImport} disabled={!selectedCount || importState === "saving"} className="w-full bg-green-500 text-slate-950 hover:bg-green-400">
+            <Button onClick={onImport} disabled={!selectedCount || importState === "saving"} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300">
               {importState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
               Import {selectedCount || ""} selected showtime{selectedCount === 1 ? "" : "s"}
             </Button>
@@ -1812,7 +1810,7 @@ function ActionPanel({
   tone: "cyan" | "violet";
   type?: "button" | "submit";
 }) {
-  const buttonClass = tone === "cyan" ? "bg-cyan-500 text-slate-950 hover:bg-cyan-400" : "bg-violet-500 text-white hover:bg-violet-600";
+  const buttonClass = tone === "cyan" ? "bg-violet-400 text-slate-950 hover:bg-violet-300" : "bg-violet-400 text-slate-950 hover:bg-violet-300";
 
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 p-4">
@@ -2162,17 +2160,6 @@ function AdminResults({
   isChangingConfirmedShowtime: boolean;
 }) {
   const winner = results?.standings?.[0];
-  const [showtimeToConfirm, setShowtimeToConfirm] = useState<string | null>(null);
-  const proposedShowtime = results?.standings?.find((standing) => standing.showtimeId === showtimeToConfirm);
-
-  async function confirmSelection() {
-    if (!showtimeToConfirm) {
-      return;
-    }
-    await onConfirm(showtimeToConfirm);
-    setShowtimeToConfirm(null);
-  }
-
   return (
     <AdminStepCard
       step="Step 4"
@@ -2199,7 +2186,7 @@ function AdminResults({
               </StatusAlert>
             ) : null}
             {canConfirm ? (
-              <Button size="sm" onClick={() => onConfirm(winner.showtimeId)} disabled={isSaving} className="mt-4 bg-green-500 text-slate-950 hover:bg-green-400">
+              <Button size="sm" onClick={() => onConfirm(winner.showtimeId)} disabled={isSaving} className="mt-4 bg-violet-400 text-slate-950 hover:bg-violet-300">
                 {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                 {isChangingConfirmedShowtime ? "Change to leader" : "Confirm leader"}
               </Button>
@@ -2292,7 +2279,7 @@ function VotingControlCard({
             <Field label="Voting deadline" htmlFor="voting-deadline">
               <Input id="voting-deadline" type="datetime-local" value={votingClosesAt} onChange={(event) => onVotingClosesAtChange(event.target.value)} className="border-white/10 bg-white/5 text-white" />
             </Field>
-            <Button onClick={onOpenVoting} disabled={isSaving || !movieNight || showtimeCount < 2 || !votingClosesAt} className="w-full bg-violet-500 text-white hover:bg-violet-600">
+            <Button onClick={onOpenVoting} disabled={isSaving || !movieNight || showtimeCount < 2 || !votingClosesAt} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300">
               {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}
               Open voting
             </Button>

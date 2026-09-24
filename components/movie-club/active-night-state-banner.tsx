@@ -9,12 +9,12 @@ import type { MovieNightStatus } from "@/lib/movie-club-types";
 type BannerTone = "violet" | "cyan" | "green" | "amber" | "rose" | "slate";
 
 const toneClasses: Record<BannerTone, string> = {
-  violet: "border-violet-400/30 bg-violet-500/10 shadow-violet-950/20",
-  cyan: "border-cyan-300/30 bg-cyan-400/10 shadow-cyan-950/20",
-  green: "border-green-400/30 bg-green-500/10 shadow-green-950/20",
-  amber: "border-amber-300/30 bg-amber-400/10 shadow-amber-950/20",
-  rose: "border-rose-400/30 bg-rose-500/10 shadow-rose-950/20",
-  slate: "border-white/10 bg-slate-900/70 shadow-black/20",
+  violet: "border-violet-300/30 bg-[#171c2d]",
+  cyan: "border-violet-300/20 bg-[#171c2d]",
+  green: "border-green-400/25 bg-[#141f23]",
+  amber: "border-amber-300/20 bg-[#1d1c22]",
+  rose: "border-rose-400/25 bg-[#241b27]",
+  slate: "border-white/10 bg-[#141b29]",
 };
 
 export function ActiveNightStateBanner({
@@ -38,10 +38,10 @@ export function ActiveNightStateBanner({
   const Icon = state.icon;
 
   return (
-    <section className={`mb-6 scroll-mt-20 rounded-lg border p-4 shadow-2xl sm:p-5 ${toneClasses[state.tone]}`}>
+    <section className={`mb-6 scroll-mt-20 rounded-xl border p-5 sm:p-6 ${toneClasses[state.tone]}`}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex gap-4">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white">
             <Icon className="size-5" />
           </div>
           <div>
@@ -55,7 +55,7 @@ export function ActiveNightStateBanner({
                 </span>
               ) : null}
             </div>
-            <h2 className="text-xl font-semibold text-white">{state.title}</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">{state.title}</h2>
             <p className="mt-1 max-w-3xl text-sm text-slate-300">{state.description}</p>
           </div>
         </div>
@@ -86,7 +86,7 @@ function getState(status: MovieNightStatus, showtimeCount: number, hasVote: bool
       description: "Check the theater, date, time, and format, then update your RSVP and ticket status.",
       action: "RSVP and ticket",
       anchor: "#rsvp",
-      primaryClass: "bg-green-500 text-slate-950 hover:bg-green-400",
+      primaryClass: "bg-violet-400 text-slate-950 hover:bg-violet-300",
     };
   }
   if (status === "voting" && !votingOpen) {
@@ -97,7 +97,7 @@ function getState(status: MovieNightStatus, showtimeCount: number, hasVote: bool
       description: "Your ballot is locked while the club admin confirms the final plan.",
       action: "Review options",
       anchor: "#showtimes",
-      primaryClass: "bg-amber-400 text-slate-950 hover:bg-amber-300",
+      primaryClass: "bg-white/10 text-white hover:bg-white/15",
     };
   }
   if (status === "voting") {
@@ -110,7 +110,7 @@ function getState(status: MovieNightStatus, showtimeCount: number, hasVote: bool
         : "Rank up to three unique showtimes. Your first choice carries the most weight.",
       action: hasVote ? "Edit vote" : "Rank showtimes",
       anchor: "#vote",
-      primaryClass: "bg-violet-500 text-white hover:bg-violet-600",
+      primaryClass: "bg-violet-400 text-slate-950 hover:bg-violet-300",
     };
   }
   if (status === "planning" && showtimeCount) {
@@ -121,7 +121,7 @@ function getState(status: MovieNightStatus, showtimeCount: number, hasVote: bool
       description: "The admin has candidate showtimes ready. Voting will open when setup is complete.",
       action: "Review options",
       anchor: "#showtimes",
-      primaryClass: "bg-amber-400 text-slate-950 hover:bg-amber-300",
+      primaryClass: "bg-white/10 text-white hover:bg-white/15",
     };
   }
   if (status === "cancelled") {
@@ -132,7 +132,7 @@ function getState(status: MovieNightStatus, showtimeCount: number, hasVote: bool
       description: "There is no action needed for this event. You can review past confirmed nights in history.",
       action: "See details",
       anchor: "#details",
-      primaryClass: "bg-rose-500 text-white hover:bg-rose-600",
+      primaryClass: "bg-white/10 text-white hover:bg-white/15",
     };
   }
   if (status === "completed") {
@@ -153,6 +153,6 @@ function getState(status: MovieNightStatus, showtimeCount: number, hasVote: bool
     description: "No vote is needed yet. Check back once the admin imports showtime options.",
     action: "View movie",
     anchor: "#details",
-    primaryClass: "bg-amber-400 text-slate-950 hover:bg-amber-300",
+    primaryClass: "bg-white/10 text-white hover:bg-white/15",
   };
 }

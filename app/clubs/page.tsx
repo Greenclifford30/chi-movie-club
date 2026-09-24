@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/movie-club/app-shell";
+import { PageSkeleton } from "@/components/movie-club/page-skeleton";
+import { EmptyState } from "@/components/movie-club/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,16 +81,16 @@ export default function ClubsPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mc-page">
         <section className="mb-8 flex flex-col gap-6 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-2 flex items-center gap-2 text-sm text-cyan-300">
               <Users className="size-4" />
               Your clubs
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Choose a movie club</h1>
+            <h1 className="mc-title">Choose a movie club</h1>
             <p className="mt-2 max-w-2xl text-slate-400">
-              Clubs are loaded from your signed-in membership records.
+              Your groups, their next plans, and the people going with you.
             </p>
           </div>
 
@@ -111,7 +113,7 @@ export default function ClubsPage() {
                   className="border-white/10 bg-white/5 text-white"
                 />
               </Field>
-              <Button type="submit" disabled={isCreating || !name.trim()} className="self-end bg-violet-500 text-white hover:bg-violet-600">
+              <Button type="submit" disabled={isCreating || !name.trim()} className="self-end bg-violet-400 text-slate-950 hover:bg-violet-300">
                 {isCreating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
                 Create
               </Button>
@@ -122,44 +124,34 @@ export default function ClubsPage() {
         {error ? <Alert>{error}</Alert> : null}
 
         {isLoadingClubs ? (
-          <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-slate-900/70 p-5 text-slate-300">
-            <Loader2 className="size-5 animate-spin text-cyan-300" />
-            Loading clubs...
-          </div>
+          <PageSkeleton label="Loading clubs" />
         ) : clubs.length ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             {clubs.map((club) => (
               <Link
                 key={club.clubId}
                 href={`/clubs/${encodeURIComponent(club.clubId)}`}
-                className="rounded-lg border border-violet-400/25 bg-slate-900/80 p-5 shadow-2xl shadow-black/20 transition hover:border-cyan-300/40"
+                className="group flex flex-col justify-between rounded-xl border border-white/10 bg-[#141b29] p-6 transition hover:-translate-y-0.5 hover:border-violet-300/40 hover:bg-[#192235] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-semibold text-white">{club.name}</h2>
                     <p className="mt-2 text-sm text-slate-400">
                       {club.role ? `${club.role.charAt(0).toUpperCase()}${club.role.slice(1)}` : "Member"}
-                      {club.memberCount ? ` / ${club.memberCount} members` : ""}
+                      {club.memberCount !== undefined ? ` · ${club.memberCount} members` : ""}
                     </p>
+                    {club.activeStatus ? <p className="mt-5 text-xs font-semibold uppercase tracking-[.12em] text-violet-200">{club.activeStatus === "voting" ? "Voting open" : club.activeStatus === "confirmed" ? "Plan confirmed" : club.activeStatus === "planning" ? "Planning" : club.activeStatus}</p> : null}
                   </div>
-                  <div className="rounded-full bg-violet-400/15 p-2 text-violet-200">
+                  <div className="rounded-md bg-violet-400/10 p-2 text-violet-200">
                     <CalendarDays className="size-5" />
                   </div>
                 </div>
-                <Button className="mt-8 w-full bg-violet-500 text-white hover:bg-violet-600">
-                  Open club
-                  <ArrowRight className="size-4" />
-                </Button>
+                <span className="mt-8 flex items-center gap-2 text-sm font-semibold text-violet-200 transition group-hover:gap-3">Open club <ArrowRight className="size-4" /></span>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-white/10 bg-slate-900/70 p-8 text-center">
-            <h2 className="text-xl font-semibold text-white">You are not in any movie clubs yet.</h2>
-            <p className="mt-2 text-slate-400">
-              Ask a club admin for an invite link, or create a club if your account has platform admin access.
-            </p>
-          </div>
+          <EmptyState title="No clubs yet" description="Ask a club admin for an invite link, or create a club if your account has platform admin access." />
         )}
       </div>
     </AppShell>
