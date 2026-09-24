@@ -700,7 +700,9 @@ export default function ClubAdminPage() {
       setMessage(`${result.message} Tracking ID: ${result.eventId}. Check your activity inbox, email, and enabled browser push notifications.`);
     } catch (testError) {
       setTestNotificationState("error");
-      setError(testError instanceof Error ? testError.message : "Unable to queue a test notification.");
+      setError(testError instanceof MovieClubApiError && testError.status === 404
+        ? "The test-notification endpoint has not been deployed yet. Deploy the cmc-manage-notifications-lambda, then try again."
+        : testError instanceof Error ? testError.message : "Unable to queue a test notification.");
     }
   }
 
