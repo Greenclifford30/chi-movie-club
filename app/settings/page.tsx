@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, MapPin, Settings } from "lucide-react";
+import { BellRing, Check, Loader2, MapPin, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/movie-club/app-shell";
 import {
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { getUserPlanningPreferences, MovieClubApiError, updateUserPlanningPreferences } from "@/lib/movie-club-api";
 import { useAuth } from "@/lib/auth-context";
-import type { UserPlanningPreferences } from "@/lib/movie-club-types";
+import type { PushSubscriptionPayload, UserPlanningPreferences } from "@/lib/movie-club-types";
 
 const fallbackPreferences: UserPlanningPreferences = {
   defaultZipCode: DEFAULT_PLANNING_ZIP,
@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [isEnablingPush, setIsEnablingPush] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -66,6 +67,7 @@ export default function SettingsPage() {
         defaultRadiusMiles: preferences.defaultRadiusMiles,
         preferredFormats: preferences.preferredFormats,
         reminderEmailsEnabled: preferences.reminderEmailsEnabled !== false,
+        pushNotificationsEnabled: preferences.pushNotificationsEnabled === true,
       });
       setPreferences(result.preferences);
       setMessage("Planning defaults saved.");
@@ -73,6 +75,53 @@ export default function SettingsPage() {
       setError(saveError instanceof Error ? saveError.message : "Unable to save planning defaults.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function enablePushNotifications() {
+    if (!token) return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      setError("This browser does not support push notifications.");
+      return;
+    }
+    const publicKey = process.env.NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY;
+    if (!publicKey) {
+      setError("Push notifications are not configured for this environment.");
+      return;
+    }
+    setIsEnablingPush(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Notification permission was not granted.");
+      const registration = await navigator.serviceWorker.register("/push-notifications.js");
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64UrlToUint8Array(publicKey),
+      });
+      const subscriptionJson = subscription.toJSON();
+      if (!subscriptionJson.endpoint || !subscriptionJson.keys?.p256dh || !subscriptionJson.keys.auth) {
+        throw new Error("The browser returned an incomplete push subscription.");
+      }
+      const pushSubscription: PushSubscriptionPayload = {
+        endpoint: subscriptionJson.endpoint,
+        keys: { p256dh: subscriptionJson.keys.p256dh, auth: subscriptionJson.keys.auth },
+      };
+      const result = await updateUserPlanningPreferences(token, {
+        defaultZipCode: preferences.defaultZipCode.trim(),
+        defaultRadiusMiles: preferences.defaultRadiusMiles,
+        preferredFormats: preferences.preferredFormats,
+        reminderEmailsEnabled: preferences.reminderEmailsEnabled !== false,
+        pushNotificationsEnabled: true,
+        pushSubscription,
+      });
+      setPreferences(result.preferences);
+      setMessage("Push notifications enabled for this browser.");
+    } catch (pushError) {
+      setError(pushError instanceof Error ? pushError.message : "Unable to enable push notifications.");
+    } finally {
+      setIsEnablingPush(false);
     }
   }
 
@@ -111,9 +160,21 @@ export default function SettingsPage() {
               <input type="checkbox" checked={preferences.reminderEmailsEnabled !== false} onChange={(event) => setPreferences((current) => ({ ...current, reminderEmailsEnabled: event.target.checked }))} className="mt-0.5 size-4 accent-cyan-400" />
               <span><span className="block font-medium text-white">Email deadline reminders</span>Receive vote and RSVP reminders. Important plan changes always remain in your activity inbox.</span>
             </label>
+            <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+              <span><span className="block font-medium text-white">Browser push notifications</span>{preferences.pushNotificationsEnabled ? "Enabled for this browser. Plan updates will also appear as device notifications." : "Get movie-night updates even when this tab is closed."}</span>
+              <Button type="button" variant="outline" onClick={enablePushNotifications} disabled={isLoading || isEnablingPush} className="border-cyan-400/40 text-cyan-200 hover:bg-cyan-400/10">
+                {isEnablingPush ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}{preferences.pushNotificationsEnabled ? "Refresh push" : "Enable push"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
     </AppShell>
   );
+}
+
+function base64UrlToUint8Array(value: string) {
+  const padded = `${value}${"=".repeat((4 - (value.length % 4)) % 4)}`.replace(/-/g, "+").replace(/_/g, "/");
+  const decoded = window.atob(padded);
+  return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
 }

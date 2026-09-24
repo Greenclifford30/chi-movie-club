@@ -24,7 +24,16 @@ export interface UserPlanningPreferences {
   defaultRadiusMiles: number;
   preferredFormats: string[];
   reminderEmailsEnabled?: boolean;
+  pushNotificationsEnabled?: boolean;
   updatedAt?: string;
+}
+
+export interface PushSubscriptionPayload {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
 }
 
 export interface ClubInvite {

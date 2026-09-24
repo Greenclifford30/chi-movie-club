@@ -8,6 +8,7 @@ import type {
   Club,
   ClubInvite,
   ClubMembership,
+  PushSubscriptionPayload,
   ClubsResponse,
   HistoryMovieNight,
   MovieDiscoveryResult,
@@ -121,7 +122,11 @@ export function getUserPlanningPreferences(token: string) {
 
 export function updateUserPlanningPreferences(
   token: string,
-  preferences: Pick<UserPlanningPreferences, "defaultZipCode" | "defaultRadiusMiles" | "preferredFormats"> & { reminderEmailsEnabled?: boolean }
+  preferences: Pick<UserPlanningPreferences, "defaultZipCode" | "defaultRadiusMiles" | "preferredFormats"> & {
+    reminderEmailsEnabled?: boolean;
+    pushNotificationsEnabled?: boolean;
+    pushSubscription?: PushSubscriptionPayload;
+  }
 ) {
   return apiFetch<{ preferences: UserPlanningPreferences }>(token, "/me/preferences", {
     method: "PUT",
