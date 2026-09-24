@@ -95,7 +95,8 @@ export default function SettingsPage() {
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") throw new Error("Notification permission was not granted.");
-      const registration = await navigator.serviceWorker.register("/push-notifications.js");
+      await navigator.serviceWorker.register("/push-notifications.js");
+      const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: base64UrlToUint8Array(publicKey),
