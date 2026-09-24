@@ -116,7 +116,7 @@ export interface MovieNight {
 
 export interface Notification {
   notificationId: string;
-  type: "voting_open" | "showtime_confirmed" | "showtime_changed" | "movie_night_cancelled" | "vote_reminder" | "rsvp_reminder";
+  type: "voting_open" | "showtime_confirmed" | "showtime_changed" | "movie_night_cancelled" | "vote_reminder" | "rsvp_reminder" | "test_notification";
   title: string;
   body: string;
   href: string;

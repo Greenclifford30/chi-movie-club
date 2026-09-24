@@ -153,6 +153,13 @@ export function markAllNotificationsRead(token: string) {
   return apiFetch<{ readAt: string }>(token, "/me/notifications/read-all", { method: "POST", body: "{}" });
 }
 
+export function sendTestNotification(token: string, clubId: string) {
+  return apiFetch<{ eventId: string; message: string }>(token, "/me/notifications/test", {
+    method: "POST",
+    body: JSON.stringify({ clubId }),
+  });
+}
+
 export function revokeClubInvite(token: string, clubId: string, inviteId: string) {
   return apiFetch<{ inviteId: string; status: "revoked" }>(
     token,

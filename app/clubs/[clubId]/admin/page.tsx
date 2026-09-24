@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BellRing,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -68,6 +69,7 @@ import {
   rejectShowtimeCandidate,
   searchGracenoteShowtimes,
   searchMovies,
+  sendTestNotification,
   updateMovieNightPlanning,
   updateMovieNightSetup,
 } from "@/lib/movie-club-api";
@@ -164,6 +166,7 @@ export default function ClubAdminPage() {
   const [confirmState, setConfirmState] = useState<ActionState>("idle");
   const [completeState, setCompleteState] = useState<ActionState>("idle");
   const [cancelState, setCancelState] = useState<ActionState>("idle");
+  const [testNotificationState, setTestNotificationState] = useState<ActionState>("idle");
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [supportsNativeShare, setSupportsNativeShare] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -686,6 +689,21 @@ export default function ClubAdminPage() {
     }
   }
 
+  async function handleTestNotification() {
+    if (!token) return;
+    setTestNotificationState("saving");
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await sendTestNotification(token, clubId);
+      setTestNotificationState("saved");
+      setMessage(`${result.message} Tracking ID: ${result.eventId}. Check your activity inbox, email, and enabled browser push notifications.`);
+    } catch (testError) {
+      setTestNotificationState("error");
+      setError(testError instanceof Error ? testError.message : "Unable to queue a test notification.");
+    }
+  }
+
   async function handleCreateInvites(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) {
@@ -921,6 +939,12 @@ export default function ClubAdminPage() {
               <Metric label="Ballots" value={results ? `${results.voteCount} submitted` : "Not open yet"} />
               <Metric label="Voting closes" value={movieNight?.votingClosesAt ? formatDate(movieNight.votingClosesAt) : "Backend controlled"} />
             </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" onClick={handleTestNotification} disabled={testNotificationState === "saving"} className="border-cyan-400/40 text-cyan-200 hover:bg-cyan-400/10">
+              {testNotificationState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}Send test notification
+            </Button>
+            <p className="text-xs text-slate-400">Sends a real test only to your admin account through the activity inbox, email, and enabled browser push.</p>
           </div>
         </section>
 
