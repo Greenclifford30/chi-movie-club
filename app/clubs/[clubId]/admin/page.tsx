@@ -1234,7 +1234,7 @@ export default function ClubAdminPage() {
             <Card className={`${activeSection === "people" ? "" : "hidden"} border-white/10 bg-slate-900/80 py-6`}>
               <CardHeader>
                 <h2 className="font-semibold text-white">Club members</h2>
-                <p className="text-sm text-slate-400">Current active users in this club.</p>
+                <p className="text-sm text-slate-400">See who receives email deadline reminders and browser push alerts.</p>
               </CardHeader>
               <CardContent><MemberList members={members} /></CardContent>
             </Card>
@@ -2465,9 +2465,21 @@ export function MemberList({ members }: { members: ClubMembership[] }) {
             <span className="rounded border border-green-300/20 bg-green-400/10 px-2 py-0.5 text-xs capitalize text-green-100">{member.role}</span>
           </div>
           <p className="mt-1 text-xs text-slate-400">{member.name && member.email ? member.email : ""}{member.name && member.email ? " · " : ""}{member.status || "active"} membership</p>
+          <div className="mt-3 flex flex-wrap gap-2" aria-label={`Alert preferences for ${member.name || member.email || member.userId}`}>
+            <PreferenceBadge label="Email reminders" enabled={member.reminderEmailsEnabled !== false} />
+            <PreferenceBadge label="Browser push" enabled={member.pushNotificationsEnabled === true} />
+          </div>
         </div>
       ))}
     </div>
+  );
+}
+
+function PreferenceBadge({ label, enabled }: { label: string; enabled: boolean }) {
+  return (
+    <span className={`rounded border px-2 py-1 text-xs ${enabled ? "border-cyan-300/20 bg-cyan-400/10 text-cyan-100" : "border-slate-300/15 bg-slate-400/5 text-slate-400"}`}>
+      {label}: {enabled ? "On" : "Off"}
+    </span>
   );
 }
 

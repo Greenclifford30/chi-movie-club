@@ -59,6 +59,8 @@ export interface ClubMembership {
   name?: string;
   role: ClubRole;
   status?: "active" | "invited" | "removed";
+  reminderEmailsEnabled?: boolean;
+  pushNotificationsEnabled?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
