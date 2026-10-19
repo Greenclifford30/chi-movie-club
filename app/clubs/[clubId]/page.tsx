@@ -17,11 +17,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import { formatDate, posterUrl, showtimeDateTime } from "@/lib/movie-club-format";
-import { getActiveMovieNight, submitVote, updateRsvp } from "@/lib/movie-club-api";
+import { getActiveMovieNight, getMovieNight, submitVote, updateRsvp } from "@/lib/movie-club-api";
 import type { ActiveMovieNightResponse, RsvpStatus, Showtime, TicketStatus } from "@/lib/movie-club-types";
 
 export default function ActiveClubPage() {
-  const { clubId } = useParams<{ clubId: string }>();
+  const { clubId, movieNightId } = useParams<{ clubId: string; movieNightId?: string }>();
   const router = useRouter();
   const { token, identityProvider } = useAuth();
   const [data, setData] = useState<ActiveMovieNightResponse | null>(null);
@@ -43,8 +43,9 @@ export default function ActiveClubPage() {
       setIsRedirecting(false);
       setError(null);
       try {
-        const active = await getActiveMovieNight(token, clubId);
-        if (active.movieNight.status === "completed") {
+        const active = movieNightId ? await getMovieNight(token, movieNightId) : await getActiveMovieNight(token, clubId);
+        if (active.movieNight.clubId !== clubId) throw new Error("Movie night does not belong to this club.");
+        if (!movieNightId && active.movieNight.status === "completed") {
           setIsRedirecting(true);
           router.replace(`/clubs/${clubId}/history`);
           return;
@@ -67,7 +68,7 @@ export default function ActiveClubPage() {
     }
 
     load();
-  }, [clubId, router, token]);
+  }, [clubId, movieNightId, router, token]);
 
   const groupedShowtimes = useMemo(() => {
     return (data?.showtimes || []).reduce<Record<string, Showtime[]>>((acc, showtime) => {

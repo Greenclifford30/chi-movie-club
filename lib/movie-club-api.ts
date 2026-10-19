@@ -13,6 +13,8 @@ import type {
   HistoryMovieNight,
   MovieDiscoveryResult,
   MovieProposal,
+  MovieProposalStatus,
+  MovieNightSummary,
   MovieNightPlanningInput,
   MovieSnapshot,
   Rsvp,
@@ -29,12 +31,14 @@ import type {
 export class MovieClubApiError extends Error {
   status: number;
   requestId?: string;
+  existingProposalId?: string;
 
-  constructor(message: string, status: number, requestId?: string) {
+  constructor(message: string, status: number, requestId?: string, existingProposalId?: string) {
     super(message);
     this.name = "MovieClubApiError";
     this.status = status;
     this.requestId = requestId;
+    this.existingProposalId = existingProposalId;
   }
 }
 
@@ -74,6 +78,7 @@ async function apiFetch<T>(
         : "Movie Club API request failed.",
       response.status,
       response.headers.get("x-movie-club-request-id") || undefined,
+      body?.existingProposalId,
     );
   }
 
@@ -100,6 +105,7 @@ async function publicApiFetch<T>(path: string, init: RequestInit = {}): Promise<
         : "Movie Club API request failed.",
       response.status,
       response.headers.get("x-movie-club-request-id") || undefined,
+      body?.existingProposalId,
     );
   }
 
@@ -227,9 +233,11 @@ export function discoverMovies(token: string, mode: "now-playing" | "coming-soon
   return apiFetch<{ results: MovieDiscoveryResult[] }>(token, `/movies/now-playing?${params}`);
 }
 
-export function listMovieProposals(token: string, clubId: string, status: "open" | "scheduled" = "open") {
+export function listMovieProposals(token: string, clubId: string, status: MovieProposalStatus = "open", options: { cursor?: string; limit?: number } = {}) {
   const params = new URLSearchParams({ status });
-  return apiFetch<{ proposals: MovieProposal[]; nextCursor?: string }>(
+  if (options.cursor) params.set("cursor", options.cursor);
+  if (options.limit) params.set("limit", String(options.limit));
+  return apiFetch<{ proposals: MovieProposal[]; nextCursor?: string | null }>(
     token,
     `/clubs/${encodeURIComponent(clubId)}/movie-proposals?${params}`
   );
@@ -268,7 +276,7 @@ export function updateMovieProposal(
   token: string,
   clubId: string,
   proposalId: string,
-  changes: { reason?: string; status?: "withdrawn"; version: number }
+  changes: { reason?: string; status?: "withdrawn" | "dismissed"; moderationReason?: string; version: number }
 ) {
   return apiFetch<{ proposal: MovieProposal }>(
     token,
@@ -280,7 +288,7 @@ export function updateMovieProposal(
 export function createMovieNight(
   token: string,
   clubId: string,
-  body: MovieNightPlanningInput & { movieSelectionMode: "admin_selected"; movie: MovieSnapshot }
+  body: MovieNightPlanningInput & { movieSelectionMode: "admin_selected"; movie: MovieSnapshot; idempotencyKey?: string }
 ) {
   return apiFetch<{ movieNight: ActiveMovieNightResponse["movieNight"] }>(
     token,
@@ -521,4 +529,23 @@ export function listHistory(token: string, clubId: string) {
 function attachmentFilename(contentDisposition: string | null) {
   const match = contentDisposition?.match(/filename="?([^";]+)"?/i);
   return match?.[1];
+}
+
+export function scheduleMovieProposal(token: string, clubId: string, proposalId: string,
+  planning: MovieNightPlanningInput & { version: number; idempotencyKey: string }) {
+  return apiFetch<{ proposal: MovieProposal; movieNight: ActiveMovieNightResponse["movieNight"] }>(
+    token, `/clubs/${encodeURIComponent(clubId)}/movie-proposals/${encodeURIComponent(proposalId)}/schedule`,
+    { method: "POST", body: JSON.stringify(planning) });
+}
+
+export function listMovieNights(token: string, clubId: string, options: { cursor?: string; limit?: number } = {}) {
+  const params = new URLSearchParams({ scope: "upcoming" });
+  if (options.cursor) params.set("cursor", options.cursor);
+  if (options.limit) params.set("limit", String(options.limit));
+  return apiFetch<{ movieNights: MovieNightSummary[]; nextCursor?: string | null }>(
+    token, `/clubs/${encodeURIComponent(clubId)}/movie-nights?${params}`);
+}
+
+export function getMovieNight(token: string, movieNightId: string) {
+  return apiFetch<ActiveMovieNightResponse>(token, `/movie-nights/${encodeURIComponent(movieNightId)}`);
 }

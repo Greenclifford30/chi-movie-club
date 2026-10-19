@@ -5,7 +5,7 @@ import {
   MemberList,
   inviteShareData,
   shareInviteNatively,
-} from "@/app/clubs/[clubId]/admin/page";
+} from "@/app/clubs/[clubId]/admin/admin-client";
 import type { ClubInvite } from "@/lib/movie-club-types";
 
 const invite: ClubInvite = {

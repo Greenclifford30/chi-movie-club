@@ -7,10 +7,12 @@ export type TicketStatus = "not_purchased" | "purchased";
 export type ClubRole = "admin" | "friend" | "guest";
 
 export interface Club {
+  upcomingNightCount?: number;
+  nextMovieNight?: MovieNight | null;
   clubId: string;
   name: string;
   role?: ClubRole;
-  activeStatus?: MovieNightStatus;
+  activeStatus?: MovieNightStatus | null;
   memberCount?: number;
 }
 
@@ -85,6 +87,9 @@ export interface MovieSnapshot {
 }
 
 export interface MovieNight {
+  version?: number;
+  proposalId?: string;
+  proposedByUserId?: string;
   clubId: string;
   movieNightId: string;
   status: MovieNightStatus;
@@ -321,6 +326,12 @@ export interface HistoryMovieNight extends MovieNight {
 }
 
 export interface ApiErrorBody {
+  existingProposalId?: string;
   error?: string;
   message?: string;
 }
+
+export type MovieNightSummary = MovieNight & {
+  currentUserVote: Vote | null;
+  currentUserRsvp: Rsvp | null;
+};
