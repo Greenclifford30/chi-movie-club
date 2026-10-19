@@ -12,6 +12,7 @@ import type {
   ClubsResponse,
   HistoryMovieNight,
   MovieDiscoveryResult,
+  MovieProposal,
   MovieNightPlanningInput,
   MovieSnapshot,
   Rsvp,
@@ -224,6 +225,56 @@ export function getNowPlayingMovies(token: string, page = 1) {
 export function discoverMovies(token: string, mode: "now-playing" | "coming-soon", page = 1) {
   const params = new URLSearchParams({ mode, page: String(page) });
   return apiFetch<{ results: MovieDiscoveryResult[] }>(token, `/movies/now-playing?${params}`);
+}
+
+export function listMovieProposals(token: string, clubId: string, status: "open" | "scheduled" = "open") {
+  const params = new URLSearchParams({ status });
+  return apiFetch<{ proposals: MovieProposal[]; nextCursor?: string }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/movie-proposals?${params}`
+  );
+}
+
+export function createMovieProposal(
+  token: string,
+  clubId: string,
+  movie: Pick<MovieSnapshot, "provider" | "externalId">,
+  reason?: string
+) {
+  return apiFetch<{ proposal: MovieProposal }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/movie-proposals`,
+    { method: "POST", body: JSON.stringify({ ...movie, ...(reason ? { reason } : {}) }) }
+  );
+}
+
+export function endorseMovieProposal(token: string, clubId: string, proposalId: string) {
+  return apiFetch<{ proposal: MovieProposal }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/movie-proposals/${encodeURIComponent(proposalId)}/endorsement`,
+    { method: "PUT", body: "{}" }
+  );
+}
+
+export function removeMovieProposalEndorsement(token: string, clubId: string, proposalId: string) {
+  return apiFetch<{ proposal: MovieProposal }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/movie-proposals/${encodeURIComponent(proposalId)}/endorsement`,
+    { method: "DELETE" }
+  );
+}
+
+export function updateMovieProposal(
+  token: string,
+  clubId: string,
+  proposalId: string,
+  changes: { reason?: string; status?: "withdrawn"; version: number }
+) {
+  return apiFetch<{ proposal: MovieProposal }>(
+    token,
+    `/clubs/${encodeURIComponent(clubId)}/movie-proposals/${encodeURIComponent(proposalId)}`,
+    { method: "PATCH", body: JSON.stringify(changes) }
+  );
 }
 
 export function createMovieNight(

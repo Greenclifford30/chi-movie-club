@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CalendarDays, Film, History, Loader2, LogOut, Settings, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CalendarDays, Film, History, Lightbulb, Loader2, LogOut, Settings, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -58,6 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const navigation = clubId ? [
     { href: `/clubs/${clubId}`, label: "Active night", shortLabel: "Active", icon: CalendarDays },
+    { href: `/clubs/${clubId}/suggestions`, label: "Film suggestions", shortLabel: "Suggest", icon: Lightbulb },
     { href: `/clubs/${clubId}/history`, label: "History", shortLabel: "History", icon: History },
     ...(club?.role === "admin" || !club ? [{ href: `/clubs/${clubId}/admin`, label: "Manage", shortLabel: "Manage", icon: ShieldCheck }] : []),
   ] : [];

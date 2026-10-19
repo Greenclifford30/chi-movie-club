@@ -116,6 +116,26 @@ export interface MovieNight {
   updatedAt?: string;
 }
 
+export type MovieProposalStatus = "open" | "scheduled" | "withdrawn" | "dismissed";
+
+export interface MovieProposal {
+  proposalId: string;
+  clubId: string;
+  movie: MovieSnapshot;
+  proposedByUserId: string;
+  proposerName?: string;
+  viewerCanWithdraw?: boolean;
+  reason?: string;
+  status: MovieProposalStatus;
+  endorsementCount: number;
+  viewerHasEndorsed: boolean;
+  movieNightId?: string;
+  moderationReason?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  version: number;
+}
+
 export interface Notification {
   notificationId: string;
   type: "voting_open" | "showtime_confirmed" | "showtime_changed" | "movie_night_cancelled" | "vote_reminder" | "rsvp_reminder" | "test_notification";
