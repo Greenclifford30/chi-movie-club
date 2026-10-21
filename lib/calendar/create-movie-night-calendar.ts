@@ -6,7 +6,7 @@ import type { MovieNight, Showtime } from "@/lib/movie-club-types";
 const encoder = new TextEncoder();
 
 export type MovieNightCalendarInput = {
-  movieNight: Pick<MovieNight, "movieNightId" | "clubId" | "movie" | "calendarSequence" | "updatedAt" | "confirmedAt">;
+  movieNight: { status?: MovieNight["status"] } & Pick<MovieNight, "movieNightId" | "clubId" | "movie" | "calendarSequence" | "updatedAt" | "confirmedAt">;
   showtime: Pick<Showtime, "theaterName" | "theaterLocation" | "theaterAddress" | "startsAtUtc" | "screenFormat">;
   url: string;
   now?: Date;
@@ -88,7 +88,7 @@ export function createMovieNightCalendar(input: MovieNightCalendarInput): MovieN
     `DTSTART:${utcTimestamp(event.start.toISOString(), "DTSTART")}`,
     `DTEND:${utcTimestamp(event.end.toISOString(), "DTEND")}`,
     `SEQUENCE:${typeof movieNight.calendarSequence === "number" && Number.isInteger(movieNight.calendarSequence) && movieNight.calendarSequence >= 0 ? movieNight.calendarSequence : 0}`,
-    "STATUS:CONFIRMED",
+    movieNight.status === "cancelled" ? "STATUS:CANCELLED" : "STATUS:CONFIRMED",
     "TRANSP:OPAQUE",
     `SUMMARY:${escapeText(event.summary)}`,
     `LOCATION:${escapeText(event.location)}`,

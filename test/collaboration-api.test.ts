@@ -58,3 +58,30 @@ describe("collaboration API contracts", () => {
     expect(fetch).toHaveBeenLastCalledWith("/api/backend/movie-nights/mn%2F1", expect.anything());
   });
 });
+
+describe("Phase 2 API contracts", () => {
+  it("passes agenda scope, current planning version and acknowledgement revision", async () => {
+    const { listMyMovieNights, updateMovieNight, acknowledgeMovieNightPlan } = await import("@/lib/movie-club-api");
+    const fetch = reply({ movieNights: [] });
+    await listMyMovieNights("token", { scope: "recent", cursor: "next+=", limit: 4 });
+    expect(fetch).toHaveBeenLastCalledWith("/api/backend/me/movie-nights?scope=recent&cursor=next%2B%3D&limit=4", expect.anything());
+    const planning = { version: 4, targetDate: "2099-01-01", dateWindowStart: "2099-01-01", dateWindowEnd: "2099-01-01", zipCode: "60601", radiusMiles: 10 };
+    await updateMovieNight("token", "mn/1", planning);
+    expect(fetch).toHaveBeenLastCalledWith("/api/backend/movie-nights/mn%2F1", expect.objectContaining({ method: "PATCH", body: JSON.stringify(planning) }));
+    await acknowledgeMovieNightPlan("token", "mn/1", 2);
+    expect(fetch).toHaveBeenLastCalledWith("/api/backend/movie-nights/mn%2F1/plan-acknowledgement/me", expect.objectContaining({ method: "PUT", body: JSON.stringify({ planRevision: 2 }) }));
+  });
+  it("passes lifecycle retry/version checks and an explicit RSVP revision", async () => {
+    const { confirmShowtime, cancelMovieNight, completeMovieNight, updateRsvp } = await import("@/lib/movie-club-api");
+    const fetch = reply({ movieNight: {} });
+    const options = { expectedVersion: 3, idempotencyKey: "key" };
+    await confirmShowtime("token", "night", "show", { ...options, changeReason: "New time" });
+    expect(fetch).toHaveBeenLastCalledWith("/api/backend/movie-nights/night/confirm", expect.objectContaining({ body: JSON.stringify({ showtimeId: "show", ...options, changeReason: "New time" }) }));
+    await cancelMovieNight("token", "night", options);
+    expect(fetch).toHaveBeenLastCalledWith("/api/backend/movie-nights/night/cancel", expect.objectContaining({ body: JSON.stringify(options) }));
+    await completeMovieNight("token", "night", options);
+    expect(fetch).toHaveBeenLastCalledWith("/api/backend/movie-nights/night/complete", expect.objectContaining({ body: JSON.stringify(options) }));
+    await updateRsvp("token", "night", "maybe", "not_purchased", 2);
+    expect(fetch).toHaveBeenLastCalledWith("/api/backend/movie-nights/night/rsvp", expect.objectContaining({ body: JSON.stringify({ status: "maybe", ticketStatus: "not_purchased", planRevision: 2 }) }));
+  });
+});

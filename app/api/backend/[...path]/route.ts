@@ -133,3 +133,7 @@ export async function PUT(req: NextRequest, context: Context) {
 export async function DELETE(req: NextRequest, context: Context) {
   return proxy(req, context);
 }
+
+export async function PATCH(req: NextRequest, context: Context) {
+  return proxy(req, context);
+}

@@ -31,3 +31,11 @@ describe("createMovieNightCalendar", () => {
     expect(physicalLines.every((line) => new TextEncoder().encode(line).length <= 75)).toBe(true);
   });
 });
+
+it("preserves calendar identity while cancelling with a newer sequence", () => {
+  const confirmed = createMovieNightCalendar({ ...base, movieNight: { ...base.movieNight, status: "confirmed", calendarSequence: 3 } });
+  const cancelled = createMovieNightCalendar({ ...base, movieNight: { ...base.movieNight, status: "cancelled", calendarSequence: 4 } });
+  expect(confirmed.content.match(/UID:[^\r]+/)?.[0]).toEqual(cancelled.content.match(/UID:[^\r]+/)?.[0]);
+  expect(cancelled.content).toContain("STATUS:CANCELLED");
+  expect(cancelled.content).toContain("SEQUENCE:4");
+});

@@ -57,11 +57,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [token, clubId]);
 
   const navigation = clubId ? [
-    { href: `/clubs/${clubId}`, label: "Active night", shortLabel: "Active", icon: CalendarDays },
+    { href: `/clubs/${clubId}`, label: "Schedule", shortLabel: "Schedule", icon: CalendarDays },
     { href: `/clubs/${clubId}/suggestions`, label: "Film suggestions", shortLabel: "Suggest", icon: Lightbulb },
     { href: `/clubs/${clubId}/history`, label: "History", shortLabel: "History", icon: History },
     ...(club?.role === "admin" || !club ? [{ href: `/clubs/${clubId}/admin`, label: "Manage", shortLabel: "Manage", icon: ShieldCheck }] : []),
   ] : [];
+  navigation.push({ href: "/my-movie-nights", label: "My movie nights", shortLabel: "Agenda", icon: CalendarDays });
 
   return (
     <ProtectedPage>

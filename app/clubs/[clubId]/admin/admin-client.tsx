@@ -23,8 +23,9 @@ import {
   Vote,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AdminStepCard } from "@/components/movie-club/admin-step-card";
 import { AppShell } from "@/components/movie-club/app-shell";
 import { AdminSectionNav, type AdminSection } from "@/components/movie-club/admin-section-nav";
@@ -56,13 +57,13 @@ import {
   createShareableClubInvite,
   createMovieNight,
   discoverMovies,
-  getActiveMovieNight,
   getMovieNight,
   getAttendance,
   getUserPlanningPreferences,
   getVoteResults,
   importShowtimesForMovieNight,
   listClubInvites,
+  listMovieNights,
   listClubMembers,
   MovieClubApiError,
   openVoting,
@@ -73,10 +74,11 @@ import {
   searchGracenoteShowtimes,
   searchMovies,
   sendTestNotification,
-  updateMovieNightPlanning,
+  updateMovieNight,
   updateMovieNightSetup,
 } from "@/lib/movie-club-api";
 import { formatDate, formatTime, posterUrl, showtimeDateTime, showtimeLabel } from "@/lib/movie-club-format";
+import { movieNightConflicts } from "@/lib/movie-night-conflicts";
 import { localDateValue, validatePlanningWindow } from "@/lib/movie-club-planning";
 import type { ActiveMovieNightResponse, AttendanceResponse, CachedShowtime, ClubInvite, ClubMembership, MovieDiscoveryResult, MovieNightPlanningInput, MovieNightStatus, MovieSnapshot, Showtime, VoteResults } from "@/lib/movie-club-types";
 
@@ -119,6 +121,13 @@ export default function ClubAdminPage() {
   const { clubId, movieNightId: routeMovieNightId } = useParams<{ clubId: string; movieNightId?: string }>();
   const router = useRouter();
   const { token } = useAuth();
+  const retryKeys = useRef(new Map<string, string>());
+  const [changeReason, setChangeReason] = useState("");
+  function retryKey(action: string, payload: unknown) {
+    const fingerprint = JSON.stringify([action, routeMovieNightId, payload]);
+    if (!retryKeys.current.has(fingerprint)) retryKeys.current.set(fingerprint, crypto.randomUUID());
+    return retryKeys.current.get(fingerprint)!;
+  }
   const today = useMemo(() => localDateValue(), []);
   const [active, setActive] = useState<ActiveMovieNightResponse | null>(null);
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(true);
@@ -185,7 +194,8 @@ export default function ClubAdminPage() {
       return;
     }
     try {
-      const nextActive = routeMovieNightId ? await getMovieNight(token, routeMovieNightId) : await getActiveMovieNight(token, clubId);
+      if (!routeMovieNightId) throw new MovieClubApiError("Choose an event from the schedule or create a new movie night.", 404);
+      const nextActive = await getMovieNight(token, routeMovieNightId);
       if (nextActive.movieNight.clubId !== clubId) throw new MovieClubApiError("Movie night does not belong to this club.", 403);
       setActive(nextActive);
       if (nextActive.currentUserRole && nextActive.currentUserRole !== "admin") {
@@ -370,6 +380,7 @@ export default function ClubAdminPage() {
           ...planningForm,
           targetDate: planningForm.targetDate || targetDate,
           movie: selectedMovie,
+          version: movieNight.version ?? 0,
         });
         setCachedShowtimes([]);
         setSelectedCachedKeys([]);
@@ -377,12 +388,16 @@ export default function ClubAdminPage() {
         setSelectedShowtimeDate("all");
         setShowtimeTimeBucket("all");
       } else {
-        await createMovieNight(token, clubId, {
+        const input = {
           ...planningForm,
           targetDate: planningForm.targetDate || targetDate,
           movieSelectionMode: "admin_selected",
           movie: selectedMovie,
-        });
+        } as const;
+        const created = await createMovieNight(token, clubId, { ...input, idempotencyKey: retryKey("create", input) });
+        setCreateState("saved");
+        router.push(`/clubs/${clubId}/movie-nights/${created.movieNight.movieNightId}/admin`);
+        return;
       }
       setCreateState("saved");
       setMessage(`${selectedMovie.title} is ready for showtime import.`);
@@ -390,6 +405,7 @@ export default function ClubAdminPage() {
     } catch (createError) {
       setCreateState("error");
       setError(createError instanceof Error ? createError.message : "Unable to create movie night.");
+      if (createError instanceof MovieClubApiError && createError.status === 409) await loadActive();
     }
   }
 
@@ -507,7 +523,7 @@ export default function ClubAdminPage() {
     setError(null);
     setMessage(null);
     try {
-      await updateMovieNightPlanning(token, movieNight.movieNightId, planningForm);
+      await updateMovieNight(token, movieNight.movieNightId, { ...planningForm, version: movieNight.version ?? 0 });
       setPlanningState("saved");
       setTargetDate(planningForm.targetDate);
       setMessage("Planning criteria saved.");
@@ -647,21 +663,37 @@ export default function ClubAdminPage() {
       return;
     }
     const isChangingConfirmedShowtime = active.movieNight.status === "confirmed";
-    const confirmationMessage = isChangingConfirmedShowtime
+    let confirmationMessage = isChangingConfirmedShowtime
       ? "Change the confirmed club plan to this showtime? Members will be notified of the update and may need to update their RSVP."
       : "Confirm this showtime as the final club plan? Members will be notified and can RSVP or track tickets.";
-    if (!window.confirm(confirmationMessage)) return;
     setConfirmState("saving");
+    try {
+      const selected = active.showtimes.find(s => s.showtimeId === showtimeId);
+      if (selected) {
+        const others = [];
+        let cursor: string | undefined;
+        do {
+          const page = await listMovieNights(token, clubId, { cursor });
+          others.push(...page.movieNights); cursor = page.nextCursor || undefined;
+        } while (cursor);
+        const overlaps = movieNightConflicts(active.movieNight, selected, others);
+        if (overlaps.length) confirmationMessage += "\n\n" + overlaps.map(({ movieNight, uncertain }) => `${uncertain ? "Possible overlap (end time unknown)" : "Overlaps"}: ${movieNight.movie.title}.`).join("\n") + "\nContinue with this showtime?";
+      }
+    } catch {
+      confirmationMessage += "\n\nThe overlap check is unavailable. Continue with this showtime?";
+    }
+    if (!window.confirm(confirmationMessage)) { setConfirmState("idle"); return; }
     setError(null);
     setMessage(null);
     try {
-      await confirmShowtime(token, active.movieNight.movieNightId, showtimeId);
+      await confirmShowtime(token, active.movieNight.movieNightId, showtimeId, { expectedVersion: active.movieNight.version ?? 0, changeReason, idempotencyKey: retryKey("confirm", [showtimeId, active.movieNight.version ?? 0, changeReason]) });
       setConfirmState("saved");
       setMessage(isChangingConfirmedShowtime ? "Confirmed showtime updated. Members have been notified of the change." : "Final showtime confirmed. Members can RSVP and track tickets now.");
       await loadActive();
     } catch (confirmError) {
       setConfirmState("error");
       setError(confirmError instanceof Error ? confirmError.message : "Unable to confirm showtime.");
+      if (confirmError instanceof MovieClubApiError && confirmError.status === 409) await loadActive();
     }
   }
 
@@ -674,12 +706,13 @@ export default function ClubAdminPage() {
     setError(null);
     setMessage(null);
     try {
-      await completeMovieNight(token, active.movieNight.movieNightId);
+      await completeMovieNight(token, active.movieNight.movieNightId, { expectedVersion: active.movieNight.version ?? 0, idempotencyKey: retryKey("complete", active.movieNight.version ?? 0) });
       setCompleteState("saved");
       router.push(`/clubs/${clubId}/history`);
     } catch (completeError) {
       setCompleteState("error");
       setError(completeError instanceof Error ? completeError.message : "Unable to complete movie night.");
+      if (completeError instanceof MovieClubApiError && completeError.status === 409) await loadActive();
     }
   }
 
@@ -688,13 +721,14 @@ export default function ClubAdminPage() {
     if (!window.confirm("Cancel this movie night? All club members will be notified.")) return;
     setCancelState("saving"); setError(null); setMessage(null);
     try {
-      await cancelMovieNight(token, active.movieNight.movieNightId);
+      await cancelMovieNight(token, active.movieNight.movieNightId, { expectedVersion: active.movieNight.version ?? 0, idempotencyKey: retryKey("cancel", active.movieNight.version ?? 0) });
       setCancelState("saved");
       setMessage("Movie night cancelled and members notified.");
       await loadActive();
     } catch (cancelError) {
       setCancelState("error");
       setError(cancelError instanceof Error ? cancelError.message : "Unable to cancel movie night.");
+      if (cancelError instanceof MovieClubApiError && cancelError.status === 409) await loadActive();
     }
   }
 
@@ -888,16 +922,16 @@ export default function ClubAdminPage() {
   );
   const selectedPoster = selectedMovie ? posterUrl(selectedMovie) : "";
   const hasCompletedPointer = movieNight?.status === "completed";
-  const canEditSetup = !movieNight || hasCompletedPointer || movieNight.status === "planning";
+  const canEditSetup = (!routeMovieNightId && !movieNight) || movieNight?.status === "planning";
   const canCreate = Boolean(selectedMovie && targetDate && createState !== "saving" && canEditSetup);
   const setupDescription = !movieNight
     ? "Pick a movie and date to unlock showtime import."
     : hasCompletedPointer
-      ? "This club is ready for its next movie night."
+      ? "This movie night is complete. Create a new night from the schedule."
       : movieNight.status === "planning"
-        ? "This active movie night is still in setup and can be updated before voting opens."
+        ? "This movie night can be updated before voting opens."
         : "Voting or confirmation has started, so the selected movie is locked.";
-  const createButtonLabel = !movieNight || hasCompletedPointer ? "Create movie night" : movieNight.status === "planning" ? "Update active setup" : "Movie locked";
+  const createButtonLabel = !movieNight ? "Create movie night" : movieNight.status === "planning" ? "Update this event" : "Movie locked";
   const statusLabel = formatStatus(movieNight?.status);
   const nextAction = getNextAction({
     hasMovieNight: Boolean(movieNight),
@@ -925,7 +959,10 @@ export default function ClubAdminPage() {
   if (isWorkspaceLoading) {
     return (
       <AppShell>
-        <div className="mc-page"><PageSkeleton variant="admin" label="Loading admin workspace" /></div>
+        <div className="mc-page">
+        <div className="mb-5 flex flex-wrap gap-4 text-sm text-cyan-200"><Link href={`/clubs/${clubId}`}>Club schedule</Link><Link href={`/clubs/${clubId}/movie-nights/new`}>Create a new movie night</Link>{routeMovieNightId ? <Link href={`/clubs/${clubId}/movie-nights/${routeMovieNightId}`}>Member event page</Link> : null}</div>
+        {active?.movieNight.status === "confirmed" ? <label className="mb-5 block text-sm text-slate-300">Reason for changing the plan (optional)<Input className="mt-2" maxLength={1000} value={changeReason} onChange={event => setChangeReason(event.target.value)} /></label> : null}
+<PageSkeleton variant="admin" label="Loading admin workspace" /></div>
       </AppShell>
     );
   }
@@ -2319,8 +2356,8 @@ function AttendanceSummaryCard({ status, attendance }: { status?: MovieNightStat
               <p className="font-medium text-white">{member.name || member.email || "Club member"}</p>
               {member.email ? <p className="text-xs text-slate-400">{member.email}</p> : null}
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <span className="rounded bg-cyan-400/10 px-2 py-1 text-cyan-100">{member.rsvpStatus.replace("_", " ")}</span>
-                <span className="rounded bg-green-400/10 px-2 py-1 text-green-100">{member.ticketStatus.replace("_", " ")}</span>
+                <span className="rounded bg-cyan-400/10 px-2 py-1 text-cyan-100">{member.needsReconfirmation ? `Needs reconfirmation · Previous: ${member.priorRsvpStatus?.replaceAll("_", " ")}` : member.rsvpStatus.replace("_", " ")}</span>
+                <span className="rounded bg-green-400/10 px-2 py-1 text-green-100">{member.ticketsNeedReview ? `Needs review · Previous: ${member.priorTicketStatus?.replaceAll("_", " ")}` : member.ticketStatus.replace("_", " ")}</span>
               </div>
             </div>
           ))}

@@ -34,7 +34,7 @@ export async function GET(req: NextRequest, context: Context) {
   let data: { movieNight: MovieNight; showtime: Showtime };
   try { data = await upstream.json() as typeof data; } catch { return NextResponse.json({ error: "Calendar data is invalid." }, { status: 422 }); }
   try {
-    const calendar = createMovieNightCalendar({ movieNight: data.movieNight, showtime: data.showtime, url: new URL(`/clubs/${encodeURIComponent(data.movieNight.clubId)}`, req.url).toString() });
+    const calendar = createMovieNightCalendar({ movieNight: data.movieNight, showtime: data.showtime, url: new URL(`/clubs/${encodeURIComponent(data.movieNight.clubId)}/movie-nights/${encodeURIComponent(movieNightId)}`, req.url).toString() });
     return new NextResponse(calendar.content, { status: 200, headers: { "Content-Type": "text/calendar; charset=utf-8", "Content-Disposition": `attachment; filename="${calendar.filename}"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
   } catch {
     return NextResponse.json({ error: "Confirmed Movie Night data is invalid." }, { status: 422 });

@@ -355,7 +355,7 @@ export function updateMovieNightPlanning(
 export function updateMovieNightSetup(
   token: string,
   movieNightId: string,
-  setup: MovieNightPlanningInput & { movie: MovieSnapshot }
+  setup: MovieNightPlanningInput & { movie: MovieSnapshot; version?: number }
 ) {
   return apiFetch<{ movieNight: ActiveMovieNightResponse["movieNight"] }>(
     token,
@@ -484,25 +484,25 @@ export function getVoteResults(token: string, movieNightId: string) {
   );
 }
 
-export function confirmShowtime(token: string, movieNightId: string, showtimeId: string) {
+export function confirmShowtime(token: string, movieNightId: string, showtimeId: string, options: { expectedVersion?: number; idempotencyKey?: string; changeReason?: string } = {}) {
   return apiFetch<{ movieNight: ActiveMovieNightResponse["movieNight"] }>(
     token,
     `/movie-nights/${encodeURIComponent(movieNightId)}/confirm`,
-    { method: "POST", body: JSON.stringify({ showtimeId }) }
+    { method: "POST", body: JSON.stringify({ showtimeId, ...options }) }
   );
 }
 
-export function completeMovieNight(token: string, movieNightId: string) {
+export function completeMovieNight(token: string, movieNightId: string, options: { expectedVersion?: number; idempotencyKey?: string } = {}) {
   return apiFetch<{ movieNight: ActiveMovieNightResponse["movieNight"] }>(
     token,
     `/movie-nights/${encodeURIComponent(movieNightId)}/complete`,
-    { method: "POST", body: JSON.stringify({}) }
+    { method: "POST", body: JSON.stringify(options) }
   );
 }
 
-export function cancelMovieNight(token: string, movieNightId: string) {
+export function cancelMovieNight(token: string, movieNightId: string, options: { expectedVersion?: number; idempotencyKey?: string } = {}) {
   return apiFetch<{ movieNight: ActiveMovieNightResponse["movieNight"] }>(
-    token, `/movie-nights/${encodeURIComponent(movieNightId)}/cancel`, { method: "POST", body: "{}" }
+    token, `/movie-nights/${encodeURIComponent(movieNightId)}/cancel`, { method: "POST", body: JSON.stringify(options) }
   );
 }
 
@@ -510,12 +510,13 @@ export function updateRsvp(
   token: string,
   movieNightId: string,
   status: RsvpStatus,
-  ticketStatus: TicketStatus
+  ticketStatus: TicketStatus,
+  planRevision?: number
 ) {
   return apiFetch<{ rsvp: Rsvp }>(
     token,
     `/movie-nights/${encodeURIComponent(movieNightId)}/rsvp`,
-    { method: "PUT", body: JSON.stringify({ status, ticketStatus }) }
+    { method: "PUT", body: JSON.stringify({ status, ticketStatus, planRevision }) }
   );
 }
 
@@ -548,4 +549,21 @@ export function listMovieNights(token: string, clubId: string, options: { cursor
 
 export function getMovieNight(token: string, movieNightId: string) {
   return apiFetch<ActiveMovieNightResponse>(token, `/movie-nights/${encodeURIComponent(movieNightId)}`);
+}
+
+export function updateMovieNight(token: string, movieNightId: string, changes: MovieNightPlanningInput & { version: number }) {
+  return apiFetch<{ movieNight: ActiveMovieNightResponse["movieNight"] }>(token,
+    `/movie-nights/${encodeURIComponent(movieNightId)}`, { method: "PATCH", body: JSON.stringify(changes) });
+}
+
+export function acknowledgeMovieNightPlan(token: string, movieNightId: string, planRevision: number) {
+  return apiFetch<{ acknowledgedPlanRevision: number }>(token,
+    `/movie-nights/${encodeURIComponent(movieNightId)}/plan-acknowledgement/me`, { method: "PUT", body: JSON.stringify({ planRevision }) });
+}
+
+export function listMyMovieNights(token: string, options: { scope?: "upcoming" | "recent"; cursor?: string; limit?: number } = {}) {
+  const params = new URLSearchParams({ scope: options.scope || "upcoming" });
+  if (options.cursor) params.set("cursor", options.cursor);
+  if (options.limit) params.set("limit", String(options.limit));
+  return apiFetch<{ movieNights: MovieNightSummary[]; nextCursor?: string | null }>(token, `/me/movie-nights?${params}`);
 }

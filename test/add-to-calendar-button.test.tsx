@@ -45,6 +45,7 @@ describe("AddToCalendarButton", () => {
     expect(url.searchParams.get("text")).toBe("Dune — IMAX");
     expect(url.searchParams.get("dates")).toBe("20260719T013000Z/20260719T040000Z");
     expect(url.searchParams.get("location")).toBe("Music Box, 3733 N Southport Ave, Chicago");
+    expect(url.searchParams.get("details")).toContain("/clubs/club-1/movie-nights/mn-1");
     expect(downloadMovieNightCalendar).not.toHaveBeenCalled();
     open.mockRestore();
   });
@@ -64,4 +65,19 @@ describe("AddToCalendarButton", () => {
     revokeObjectURL.mockRestore();
     click.mockRestore();
   });
+});
+
+
+it("downloads a cancelled update for Google users and explains manual imports", async () => {
+  vi.mocked(downloadMovieNightCalendar).mockResolvedValue({ blob: new Blob(["cancelled"]), filename: "dune.ics" });
+  const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:cancelled");
+  const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+  const open = vi.spyOn(window, "open").mockImplementation(() => null);
+  render(<AddToCalendarButton movieNight={{ ...movieNight, status: "cancelled", planRevision: 2 }} showtime={showtime} status="cancelled" token="token" identityProvider="google" />);
+  fireEvent.click(screen.getByRole("button", { name: "Download cancelled Movie Night calendar entry" }));
+  await waitFor(() => expect(downloadMovieNightCalendar).toHaveBeenCalledWith("token", "mn-1"));
+  expect(open).not.toHaveBeenCalled();
+  expect(screen.getByText(/Calendar imports do not update automatically/)).toBeInTheDocument();
+  createObjectURL.mockRestore(); revokeObjectURL.mockRestore(); click.mockRestore(); open.mockRestore();
 });

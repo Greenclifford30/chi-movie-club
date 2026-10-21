@@ -87,6 +87,9 @@ export interface MovieSnapshot {
 }
 
 export interface MovieNight {
+  planRevision?: number;
+  previousPlan?: Showtime | null;
+  changeReason?: string;
   version?: number;
   proposalId?: string;
   proposedByUserId?: string;
@@ -282,6 +285,8 @@ export interface VoteResults {
 }
 
 export interface Rsvp {
+  rsvpPlanRevision?: number;
+  ticketPlanRevision?: number;
   movieNightId: string;
   userId?: string;
   status: RsvpStatus;
@@ -290,6 +295,7 @@ export interface Rsvp {
 }
 
 export interface ActiveMovieNightResponse {
+  currentUserAcknowledgement?: { acknowledgedPlanRevision?: number };
   movieNight: MovieNight;
   showtimes: Showtime[];
   currentUserVote: Vote | null;
@@ -298,6 +304,10 @@ export interface ActiveMovieNightResponse {
 }
 
 export interface AttendanceMember {
+  needsReconfirmation?: boolean;
+  ticketsNeedReview?: boolean;
+  priorRsvpStatus?: RsvpStatus;
+  priorTicketStatus?: TicketStatus;
   userId: string;
   name: string;
   email: string;
@@ -332,6 +342,10 @@ export interface ApiErrorBody {
 }
 
 export type MovieNightSummary = MovieNight & {
+  clubName?: string;
+  nextActions?: string[];
+  conflicts?: { movieNightId: string; uncertain: boolean }[];
+  currentUserAcknowledgement?: { acknowledgedPlanRevision?: number };
   currentUserVote: Vote | null;
   currentUserRsvp: Rsvp | null;
 };

@@ -2,6 +2,7 @@
 
 import { CalendarDays, Film, MapPin } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/movie-club/app-shell";
@@ -77,7 +78,7 @@ export default function ClubHistoryPage() {
                       <span className="rounded bg-cyan-400/10 px-2 py-1 text-xs font-medium text-cyan-100">{night.status}</span>
                       <span className="text-xs text-slate-500">{formatDate(night.targetDate)}</span>
                     </div>
-                    <h2 className="text-xl font-semibold text-white">{night.movie.title}</h2>
+                    <h2 className="text-xl font-semibold text-white"><Link href={`/clubs/${clubId}/movie-nights/${night.movieNightId}`} className="hover:text-violet-200">{night.movie.title}</Link></h2>
                     <p className="mt-3 flex items-center gap-2 text-sm text-slate-400">
                       <MapPin className="size-4" />
                       {night.confirmedShowtime?.theaterName || "Theater TBD"}

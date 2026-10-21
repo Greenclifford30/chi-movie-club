@@ -38,8 +38,9 @@ describe("AppShell navigation", () => {
     render(<AppShell><p>History content</p></AppShell>);
 
     const nav = screen.getByRole("navigation", { name: "Club navigation" });
+    expect(within(nav).getByRole("link", { name: "Agenda" })).toHaveAttribute("href", "/my-movie-nights");
     expect(within(nav).getByRole("link", { name: "Clubs" })).toHaveAttribute("href", "/clubs");
-    expect(within(nav).getByRole("link", { name: "Active" })).toHaveAttribute("href", "/clubs/club-1");
+    expect(within(nav).getByRole("link", { name: "Schedule" })).toHaveAttribute("href", "/clubs/club-1");
     expect(within(nav).getByRole("link", { name: "History" })).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "Manage" })).toHaveAttribute("href", "/clubs/club-1/admin");
     await waitFor(() => expect(screen.getByRole("link", { name: /Friday Night Films/ })).toBeInTheDocument());
