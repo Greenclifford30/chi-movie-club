@@ -230,7 +230,7 @@ button:not(:disabled):active, a:active { transform: translateY(1px); }
   html:has(.mc-schedule-page) { scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
 }
 .mc-night-page { overflow-wrap: anywhere; }
-.mc-night-page :is(button, a, summary, [tabindex]) { scroll-margin-top: 6rem; }
+.mc-night-page :is(button, a, summary, [tabindex]) { scroll-margin-top: 8rem; }
 @media (max-width: 1023px) {
   .mc-night-page.mc-night-has-actions { padding-bottom: 6rem; }
   html:has(.mc-night-page) { scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
@@ -245,3 +245,7 @@ button:not(:disabled):active, a:active { transform: translateY(1px); }
 @media (min-width: 640px) { .mc-page { padding-inline: 1.5rem; } }
 @media (min-width: 1024px) { .mc-page { padding-inline: 2rem; padding-bottom: 5rem; } }
 @media (prefers-reduced-motion: reduce) { .mc-skeleton { animation: none; } }
+
+/* Event pages include a persistent return row beneath the main header. */
+html:has(nav[aria-label="Movie night navigation"]) { scroll-padding-top: 8rem; }
+html:has(nav[aria-label="Movie night navigation"]) main :is(a, button, input, summary, [tabindex]) { scroll-margin-top: 8rem; }
