@@ -4,6 +4,9 @@ import { MovieNightList } from "@/components/movie-club/movie-night-list";
 import { listClubs, listMovieNights, listMyMovieNights } from "@/lib/movie-club-api";
 import type { MovieNightSummary } from "@/lib/movie-club-types";
 
+const { router } = vi.hoisted(() => ({ router: { replace: vi.fn() } }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
 vi.mock("@/components/movie-club/app-shell", () => ({ AppShell: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/lib/auth-context", () => ({ useAuth: () => ({ token: "token" }) }));
 vi.mock("@/lib/movie-club-api", () => ({ listClubs: vi.fn(), listMovieNights: vi.fn(), listMyMovieNights: vi.fn() }));
@@ -19,6 +22,7 @@ describe("movie night schedule and agenda", () => {
     vi.mocked(listMovieNights).mockResolvedValueOnce({ movieNights: [night], nextCursor: "next" }).mockResolvedValueOnce({ movieNights: [{ ...night, movieNightId: "b", movie: { ...night.movie, title: "Thief" }, status: "planning", confirmedShowtime: undefined }] });
     render(<MovieNightList clubId="one" />);
     expect(await screen.findByText("Awaiting completion")).toBeInTheDocument();
+    expect(router.replace).not.toHaveBeenCalled();
     expect(screen.getByRole("link", { name: "Heat" })).toHaveAttribute("href", "/clubs/one/movie-nights/a");
     expect(await screen.findByRole("link", { name: "Create a movie night" })).toHaveAttribute("href", "/clubs/one/movie-nights/new");
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
@@ -94,26 +98,26 @@ describe("schedule clarity and recovery", () => {
     expect(screen.getByRole("link", { name: "View movie night" })).toBeInTheDocument();
   });
 
-  it("gives members a useful empty state without admin controls", async () => {
+  it.each(["friend", "admin"] as const)("redirects %s users from an empty club schedule to suggestions", async role => {
+    vi.mocked(listClubs).mockResolvedValue({ clubs: [{ clubId: "one", name: "Club one", role }], isPlatformAdmin: false });
     vi.mocked(listMovieNights).mockResolvedValue({ movieNights: [] });
     render(<MovieNightList clubId="one" />);
-    expect(await screen.findByText("No movie nights planned")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View club history" })).toHaveAttribute("href", "/clubs/one/history");
-    expect(screen.queryByRole("link", { name: "Create a movie night" })).not.toBeInTheDocument();
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/clubs/one/suggestions"));
+    expect(screen.queryByText("No movie nights planned")).not.toBeInTheDocument();
   });
 
-  it("provides a single creation action for admins on an empty schedule", async () => {
-    vi.mocked(listClubs).mockResolvedValue({ clubs: [{ clubId: "one", name: "Club one", role: "admin" }], isPlatformAdmin: false });
-    vi.mocked(listMovieNights).mockResolvedValue({ movieNights: [] });
-    render(<MovieNightList clubId="one" />);
+  it("keeps the empty aggregate agenda on its own page", async () => {
+    vi.mocked(listMyMovieNights).mockResolvedValue({ movieNights: [] });
+    render(<MovieNightList />);
     expect(await screen.findByText("No movie nights planned")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "Create a movie night" })).toHaveLength(1);
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("retries an initial failure without showing a misleading empty state", async () => {
     vi.mocked(listMovieNights).mockRejectedValueOnce(new Error("Schedule unavailable.")).mockResolvedValueOnce({ movieNights: [night] });
     render(<MovieNightList clubId="one" />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Schedule unavailable.");
+    expect(router.replace).not.toHaveBeenCalled();
     expect(screen.queryByText("No movie nights planned")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("article", { name: "Heat" })).toBeInTheDocument();

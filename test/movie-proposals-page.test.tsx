@@ -22,6 +22,25 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe("film proposal controls", () => {
+  it("shows an empty search state only after a completed search", async () => {
+    vi.mocked(api.searchMovies).mockResolvedValue({ results: [] });
+    render(<ClubSuggestionsPage />);
+    await screen.findByText("Heat");
+    fireEvent.change(screen.getByLabelText("Search movie titles"), { target: { value: "Missing film" } });
+    expect(screen.queryByText("No films found. Try another title.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Search movies" }));
+    expect(await screen.findByText("No films found. Try another title.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Search movie titles"), { target: { value: "Another film" } });
+    expect(screen.queryByText("No films found. Try another title.")).not.toBeInTheDocument();
+  });
+  it("describes the selected status when the filtered list is empty", async () => {
+    vi.mocked(api.listMovieProposals).mockResolvedValue({ proposals: [] });
+    render(<ClubSuggestionsPage />);
+    await screen.findByText("No film suggestions yet");
+    fireEvent.change(screen.getByRole("combobox", { name: "Suggestion status" }), { target: { value: "scheduled" } });
+    expect(await screen.findByRole("heading", { name: "No scheduled suggestions" })).toBeInTheDocument();
+    expect(screen.queryByText("Start the list with a film you would like to watch together.")).not.toBeInTheDocument();
+  });
   it("shows the full release date when a release year is also present", async () => {
     vi.mocked(api.listMovieProposals).mockResolvedValue({ proposals: [{ ...proposal, movie: { ...proposal.movie, releaseDate: "2026-12-18", releaseYear: "2026" } }] });
     render(<ClubSuggestionsPage />);

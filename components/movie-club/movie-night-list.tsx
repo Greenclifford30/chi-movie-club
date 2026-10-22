@@ -3,6 +3,7 @@
 import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, Film, Loader2, MapPin, Plus } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type FocusEvent, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/movie-club/app-shell";
 import { EmptyState } from "@/components/movie-club/empty-state";
@@ -23,6 +24,7 @@ const actionLabels: Record<string, string> = {
 
 export function MovieNightList({ clubId }: { clubId?: string }) {
   const { token } = useAuth();
+  const router = useRouter();
   const [nights, setNights] = useState<MovieNightSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [scope, setScope] = useState<"upcoming" | "recent">("upcoming");
@@ -49,6 +51,9 @@ export function MovieNightList({ clubId }: { clubId?: string }) {
     request
       .then(result => {
         if (!cancelled) {
+          if (clubId && !result.movieNights.length && !result.nextCursor) {
+            router.replace(`/clubs/${encodeURIComponent(clubId)}/suggestions`);
+          }
           setNights(result.movieNights);
           setCursor(result.nextCursor || null);
         }
@@ -67,7 +72,7 @@ export function MovieNightList({ clubId }: { clubId?: string }) {
         .catch(() => {});
     }
     return () => { cancelled = true; requestVersion.current += 1; };
-  }, [clubId, scope, token, retry]);
+  }, [clubId, scope, token, retry, router]);
 
   async function loadMore() {
     if (!token || !cursor || loadingMore) return;
@@ -121,7 +126,7 @@ export function MovieNightList({ clubId }: { clubId?: string }) {
           </StatusAlert>
         ) : null}
 
-        {loading ? <ScheduleSkeleton /> : !nights.length && !error ? (
+        {loading || (clubId && !nights.length && !cursor && !error) ? <ScheduleSkeleton /> : !nights.length && !error ? (
           <EmptyState
             className="[&_[data-slot=button]]:h-auto [&_[data-slot=button]]:min-h-11 [&_[data-slot=button]]:whitespace-normal"
             icon={<CalendarDays aria-hidden="true" className="size-5" />}
