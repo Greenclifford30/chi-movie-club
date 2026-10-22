@@ -28,6 +28,16 @@ beforeEach(() => vi.mocked(getMovieNight).mockResolvedValue(voting));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe("Movie Night participation", () => {
+  it("keeps a schedule exit while loading and after a failed request", async () => {
+    let reject!: (error: Error) => void;
+    vi.mocked(getMovieNight).mockReturnValue(new Promise((_, rejectRequest) => { reject = rejectRequest; }));
+    render(<EventDetail />);
+    expect(screen.getByRole("link", { name: "Club schedule" })).toHaveAttribute("href", "/clubs/club");
+    reject(new Error("Night unavailable"));
+    expect(await screen.findByText("Night unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Club schedule" })).toHaveAttribute("href", "/clubs/club");
+  });
+
   it("adds unique showtimes to the ballot and saves rankings without a duplicate recap", async () => {
     vi.mocked(submitVote).mockResolvedValue({ vote: { movieNightId: "night", rankings: ["one", "two"] } });
     render(<EventDetail />);

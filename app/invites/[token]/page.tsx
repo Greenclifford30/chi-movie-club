@@ -181,6 +181,9 @@ export default function InvitePage() {
             )}
           </div>
         ) : null}
+        <Link href={isAuthenticated ? "/clubs" : "/sign-in"} className="mt-6 inline-flex min-h-11 items-center text-sm text-cyan-200 hover:text-white focus-visible:outline-2 focus-visible:outline-violet-300">
+          {isAuthenticated ? "Back to clubs" : "Back to sign in"}
+        </Link>
       </section>
     </main>
   );

@@ -221,7 +221,7 @@ export default function ClubSuggestionsPage() {
               <span className="text-sm text-slate-400">{proposals.length} {proposals.length === 1 ? "film" : "films"}</span>
             </div>
             {isLoading ? <PageSkeleton label="Loading film suggestions" /> : proposals.length ? <div className="space-y-3">
-            {proposals.map((proposal) => <ProposalCard key={proposal.proposalId} proposal={proposal} working={workingId === proposal.proposalId} onEndorse={() => void toggleEndorsement(proposal)} onWithdraw={() => void withdraw(proposal)} controls={token ? <ProposalControls proposal={proposal} token={token} clubId={clubId} isAdmin={isAdmin} onChanged={proposalChanged} onScheduled={id => router.push(`/clubs/${clubId}/movie-nights/${id}/admin`)} /> : null} />)}
+            {proposals.map((proposal) => <ProposalCard key={proposal.proposalId} proposal={proposal} working={workingId === proposal.proposalId} onEndorse={() => void toggleEndorsement(proposal)} onWithdraw={() => void withdraw(proposal)} controls={token ? <ProposalControls proposal={proposal} token={token} clubId={clubId} isAdmin={isAdmin} onChanged={proposalChanged} onScheduled={id => router.push(`/clubs/${encodeURIComponent(clubId)}/movie-nights/${encodeURIComponent(id)}/admin`)} /> : null} />)}
             </div> : !error ? <EmptyState title="No film suggestions yet" description="Start the list with a film you would like to watch together." icon={<Lightbulb className="size-5" />} /> : null}
           {cursor ? <Button className="mt-4" onClick={() => void more()} disabled={workingId === "more"}>Load more suggestions</Button> : null}
           </section>
@@ -251,7 +251,7 @@ function ProposalCard({ proposal, working, onEndorse, onWithdraw, controls }: { 
           </div>
         </div>
       </div>
-      {proposal.movieNightId ? <Link className="mt-4 block text-sm text-cyan-200" href={`/clubs/${proposal.clubId}/movie-nights/${proposal.movieNightId}`}>View scheduled movie night</Link> : null}
+      {proposal.movieNightId ? <Link className="mt-4 block text-sm text-cyan-200" href={`/clubs/${encodeURIComponent(proposal.clubId)}/movie-nights/${encodeURIComponent(proposal.movieNightId)}`}>View scheduled movie night</Link> : null}
       {proposal.moderationReason ? <p className="mt-3 text-sm text-slate-400">Dismissal reason: {proposal.moderationReason}</p> : null}
       {controls}
     </CardContent>

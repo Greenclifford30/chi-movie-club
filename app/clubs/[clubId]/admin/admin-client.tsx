@@ -122,6 +122,8 @@ export default function ClubAdminPage() {
   const router = useRouter();
   const { token } = useAuth();
   const retryKeys = useRef(new Map<string, string>());
+  const lifecyclePending = useRef(false);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [changeReason, setChangeReason] = useState("");
   function retryKey(action: string, payload: unknown) {
     const fingerprint = JSON.stringify([action, routeMovieNightId, payload]);
@@ -220,11 +222,16 @@ export default function ClubAdminPage() {
         nextActive.showtimes.length &&
         (nextActive.movieNight.status === "voting" || nextActive.movieNight.status === "confirmed")
       ) {
-        const nextResults = await getVoteResults(token, nextActive.movieNight.movieNightId);
-        setResults(nextResults);
+        try {
+          setResults(await getVoteResults(token, nextActive.movieNight.movieNightId));
+        } catch (resultsError) {
+          setResults(null);
+          setError(resultsError instanceof Error ? resultsError.message : "Unable to load vote results.");
+        }
       } else {
         setResults(null);
       }
+      return true;
     } catch (activeError) {
       setActive(null);
       setResults(null);
@@ -244,9 +251,10 @@ export default function ClubAdminPage() {
             setError(preferenceError instanceof Error ? preferenceError.message : "Unable to load planning defaults.");
           }
         }
-      } else if (activeError instanceof MovieClubApiError) {
-        setError(activeError.message);
+      } else {
+        setError(activeError instanceof Error ? activeError.message : "Unable to load movie night.");
       }
+      return false;
     }
   }
 
@@ -396,7 +404,7 @@ export default function ClubAdminPage() {
         } as const;
         const created = await createMovieNight(token, clubId, { ...input, idempotencyKey: retryKey("create", input) });
         setCreateState("saved");
-        router.push(`/clubs/${clubId}/movie-nights/${created.movieNight.movieNightId}/admin`);
+        router.push(`/clubs/${encodeURIComponent(clubId)}/movie-nights/${encodeURIComponent(created.movieNight.movieNightId)}/admin`);
         return;
       }
       setCreateState("saved");
@@ -698,37 +706,53 @@ export default function ClubAdminPage() {
   }
 
   async function handleCompleteMovieNight() {
-    if (!token || !active?.movieNight) {
-      return;
-    }
-    if (!window.confirm("Complete this movie night and move it to history?")) return;
+    if (!token || active?.movieNight.status !== "confirmed" || lifecyclePending.current) return;
+    if (!window.confirm("End this movie night? It will move to club history, and voting and RSVP will close.")) return;
+    lifecyclePending.current = true;
     setCompleteState("saving");
+    setLifecycleError(null);
     setError(null);
     setMessage(null);
     try {
-      await completeMovieNight(token, active.movieNight.movieNightId, { expectedVersion: active.movieNight.version ?? 0, idempotencyKey: retryKey("complete", active.movieNight.version ?? 0) });
+      const result = await completeMovieNight(token, active.movieNight.movieNightId, { expectedVersion: active.movieNight.version ?? 0, idempotencyKey: retryKey("complete", active.movieNight.version ?? 0) });
+      setActive(current => current ? { ...current, movieNight: result.movieNight } : current);
       setCompleteState("saved");
-      router.push(`/clubs/${clubId}/history`);
+      router.push(`/clubs/${encodeURIComponent(clubId)}/history`);
     } catch (completeError) {
+      setLifecycleError(completeError instanceof Error ? completeError.message : "Unable to complete movie night. Please try again.");
+      if (completeError instanceof MovieClubApiError && completeError.status === 409) {
+        const refreshed = await loadActive();
+        setLifecycleError(refreshed ? "The movie night changed. Its details have been refreshed; review them before trying again." : "The movie night changed and could not be refreshed. Reload this page before trying again.");
+      }
       setCompleteState("error");
-      setError(completeError instanceof Error ? completeError.message : "Unable to complete movie night.");
-      if (completeError instanceof MovieClubApiError && completeError.status === 409) await loadActive();
+    } finally {
+      lifecyclePending.current = false;
     }
   }
 
   async function handleCancelMovieNight() {
-    if (!token || !active?.movieNight) return;
-    if (!window.confirm("Cancel this movie night? All club members will be notified.")) return;
-    setCancelState("saving"); setError(null); setMessage(null);
+    if (!token || !active?.movieNight || !["planning", "voting", "confirmed"].includes(active.movieNight.status) || lifecyclePending.current) return;
+    if (!window.confirm("Cancel this movie night? Voting and RSVP will close, and all club members will be notified.")) return;
+    lifecyclePending.current = true;
+    setCancelState("saving");
+    setLifecycleError(null);
+    setError(null);
+    setMessage(null);
     try {
-      await cancelMovieNight(token, active.movieNight.movieNightId, { expectedVersion: active.movieNight.version ?? 0, idempotencyKey: retryKey("cancel", active.movieNight.version ?? 0) });
+      const result = await cancelMovieNight(token, active.movieNight.movieNightId, { expectedVersion: active.movieNight.version ?? 0, idempotencyKey: retryKey("cancel", active.movieNight.version ?? 0) });
+      setActive(current => current ? { ...current, movieNight: result.movieNight } : current);
       setCancelState("saved");
       setMessage("Movie night cancelled and members notified.");
       await loadActive();
     } catch (cancelError) {
+      setLifecycleError(cancelError instanceof Error ? cancelError.message : "Unable to cancel movie night. Please try again.");
+      if (cancelError instanceof MovieClubApiError && cancelError.status === 409) {
+        const refreshed = await loadActive();
+        setLifecycleError(refreshed ? "The movie night changed. Its details have been refreshed; review them before trying again." : "The movie night changed and could not be refreshed. Reload this page before trying again.");
+      }
       setCancelState("error");
-      setError(cancelError instanceof Error ? cancelError.message : "Unable to cancel movie night.");
-      if (cancelError instanceof MovieClubApiError && cancelError.status === 409) await loadActive();
+    } finally {
+      lifecyclePending.current = false;
     }
   }
 
@@ -893,9 +917,7 @@ export default function ClubAdminPage() {
     JSON.stringify(planningForm.preferredFormats || []) !== JSON.stringify(movieNight.preferredFormats || [])
   ));
   const currentShowtimes = active?.showtimes || [];
-  const confirmedShowtime = movieNight?.confirmedShowtime || active?.showtimes.find((showtime) => showtime.showtimeId === movieNight?.confirmedShowtimeId);
-  const confirmedStartTime = confirmedShowtime ? Date.parse(showtimeDateTime(confirmedShowtime)) : Number.NaN;
-  const canComplete = Number.isFinite(confirmedStartTime) && confirmedStartTime <= Date.now();
+  const lifecycleBusy = completeState === "saving" || cancelState === "saving";
   const planningValidationError = validatePlanningLocation(planningForm.zipCode, planningForm.radiusMiles) || validatePlanningWindow(planningForm, today);
   const showImportRecovery = Boolean(movieNight && (
     movieNight.showtimeImportStatus === "failed" ||
@@ -956,13 +978,21 @@ export default function ClubAdminPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWorkspaceLoading]);
 
+  const eventLinks = (
+    <nav aria-label="Admin movie night links" className="mb-5 flex flex-wrap gap-x-5 text-sm text-cyan-200">
+      <Link className="inline-flex min-h-11 items-center" href={`/clubs/${encodeURIComponent(clubId)}`}>Club schedule</Link>
+      <Link className="inline-flex min-h-11 items-center" href={`/clubs/${encodeURIComponent(clubId)}/movie-nights/new`}>Create a new movie night</Link>
+      {routeMovieNightId ? <Link className="inline-flex min-h-11 items-center" href={`/clubs/${encodeURIComponent(clubId)}/movie-nights/${encodeURIComponent(routeMovieNightId)}`}>View movie night</Link> : null}
+    </nav>
+  );
+
   if (isWorkspaceLoading) {
     return (
       <AppShell>
         <div className="mc-page">
-        <div className="mb-5 flex flex-wrap gap-4 text-sm text-cyan-200"><Link href={`/clubs/${clubId}`}>Club schedule</Link><Link href={`/clubs/${clubId}/movie-nights/new`}>Create a new movie night</Link>{routeMovieNightId ? <Link href={`/clubs/${clubId}/movie-nights/${routeMovieNightId}`}>Member event page</Link> : null}</div>
-        {active?.movieNight.status === "confirmed" ? <label className="mb-5 block text-sm text-slate-300">Reason for changing the plan (optional)<Input className="mt-2" maxLength={1000} value={changeReason} onChange={event => setChangeReason(event.target.value)} /></label> : null}
-<PageSkeleton variant="admin" label="Loading admin workspace" /></div>
+          {eventLinks}
+          <PageSkeleton variant="admin" label="Loading admin workspace" />
+        </div>
       </AppShell>
     );
   }
@@ -970,6 +1000,7 @@ export default function ClubAdminPage() {
   return (
     <AppShell>
       <div className="mc-page">
+        {eventLinks}
         <section className="mb-6 border-b border-white/10 pb-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -992,6 +1023,23 @@ export default function ClubAdminPage() {
           </div>
 
         </section>
+
+        {movieNight && ["planning", "voting", "confirmed"].includes(movieNight.status) ? (
+          <section aria-labelledby="event-actions-title" className="mb-6 rounded-xl border border-white/10 bg-slate-900/80 p-4 sm:p-5">
+            <h2 id="event-actions-title" className="font-semibold text-white">{movieNight.status === "confirmed" ? "End event" : "Cancel movie night"}</h2>
+            <p className="mt-2 text-sm text-slate-300">{movieNight.status === "confirmed" ? "Ending this night moves it to club history and closes voting and RSVP. You can end it at any time." : "Cancel this night to close planning and voting. Club members will be notified."}</p>
+            {lifecycleError ? <StatusAlert tone="danger" className="mt-4">{lifecycleError}</StatusAlert> : null}
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              {movieNight.status === "confirmed" ? <Button type="button" onClick={handleCompleteMovieNight} disabled={lifecycleBusy} className="min-h-11 bg-violet-400 text-slate-950 hover:bg-violet-300">
+                {completeState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}End event
+              </Button> : null}
+              <Button type="button" variant="outline" onClick={handleCancelMovieNight} disabled={lifecycleBusy} className="min-h-11 border-rose-400/40 text-rose-200 hover:bg-rose-500/10">
+                {cancelState === "saving" ? <Loader2 className="size-4 animate-spin" /> : null}Cancel movie night
+              </Button>
+            </div>
+          </section>
+        ) : lifecycleError ? <StatusAlert tone="danger" className="mb-4">{lifecycleError}</StatusAlert> : null}
+        {movieNight?.status === "confirmed" ? <label className="mb-5 block text-sm text-slate-300">Reason for changing the plan (optional)<Input className="mt-2" maxLength={1000} value={changeReason} onChange={event => setChangeReason(event.target.value)} /></label> : null}
 
         <ProgressStrip completedCount={completedProgress} />
         <AdminSectionNav active={activeSection} onChange={setActiveSection} />
@@ -1171,44 +1219,6 @@ export default function ClubAdminPage() {
           </section>
 
           <aside className={activeSection === "voting" || activeSection === "people" ? "grid gap-6 lg:col-span-12 lg:grid-cols-2 lg:items-start" : "hidden"}>
-            {movieNight?.status === "confirmed" ? (
-              <Card className={`${activeSection === "voting" ? "" : "hidden"} border-green-400/20 bg-slate-900/80 py-6 `}>
-                <CardHeader>
-                  <h2 className="font-semibold text-white">End event</h2>
-                  <p className="text-sm text-slate-400">
-                    {canComplete
-                      ? "The confirmed showtime has passed. End this event to save it to club history."
-                      : "RSVP remains open until the confirmed showtime has passed."}
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {confirmedShowtime ? (
-                    <p className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-300">
-                      {formatDate(showtimeDateTime(confirmedShowtime))} at {formatTime(showtimeDateTime(confirmedShowtime))}
-                    </p>
-                  ) : (
-                    <p className="mb-4 rounded-lg border border-amber-300/20 bg-amber-400/10 p-3 text-sm text-amber-100">
-                      A confirmed showtime is required before this event can be ended.
-                    </p>
-                  )}
-                  <Button
-                    type="button"
-                    onClick={handleCompleteMovieNight}
-                    disabled={!canComplete || completeState === "saving"}
-                    className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300"
-                  >
-                    {completeState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                    End event
-                  </Button>
-                  {movieNight && ["planning", "voting", "confirmed"].includes(movieNight.status) ? (
-                    <Button type="button" variant="outline" onClick={handleCancelMovieNight} disabled={cancelState === "saving"} className="mt-3 w-full border-rose-400/40 text-rose-200 hover:bg-rose-500/10">
-                      {cancelState === "saving" ? <Loader2 className="size-4 animate-spin" /> : null}Cancel movie night
-                    </Button>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ) : null}
-
             <Card className={`${activeSection === "people" ? "" : "hidden"} border-white/10 bg-slate-900/80 py-6`}>
               <CardHeader>
                 <h2 className="font-semibold text-white">Club invites</h2>

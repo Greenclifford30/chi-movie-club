@@ -204,6 +204,10 @@ export default function ActiveClubPage() {
   return (
     <AppShell>
       <div className={`mc-page mc-night-page ${hasSaveBar ? "mc-night-has-actions" : ""}`}>
+        <nav aria-label="Movie night links" className="mb-5 flex flex-wrap gap-x-5 text-sm text-cyan-200">
+          <Link className="inline-flex min-h-11 items-center rounded-sm hover:text-white focus-visible:outline-2 focus-visible:outline-violet-300" href={`/clubs/${encodeURIComponent(clubId)}`}>Club schedule</Link>
+          {data?.currentUserRole === "admin" && movieNight ? <Link className="inline-flex min-h-11 items-center rounded-sm hover:text-white focus-visible:outline-2 focus-visible:outline-violet-300" href={`/clubs/${encodeURIComponent(clubId)}/movie-nights/${encodeURIComponent(movieNight.movieNightId)}/admin`}>Manage this night</Link> : null}
+        </nav>
         {isLoading ? (
           <PageSkeleton variant="movie" label="Loading movie night" />
         ) : error && !data ? (
@@ -212,14 +216,10 @@ export default function ActiveClubPage() {
           <EmptyState
             title="No active movie night"
             description="An admin can create the next movie night. Check club history while setup is pending."
-            action={{ label: "View club history", href: `/clubs/${clubId}/history` }}
+            action={{ label: "View club history", href: `/clubs/${encodeURIComponent(clubId)}/history` }}
           />
         ) : (
           <>
-            <nav aria-label="Movie night links" className="mb-5 flex flex-wrap gap-x-5 text-sm text-cyan-200">
-              <Link className="inline-flex min-h-11 items-center rounded-sm hover:text-white focus-visible:outline-2 focus-visible:outline-violet-300" href={`/clubs/${clubId}`}>Club schedule</Link>
-              {data.currentUserRole === "admin" ? <Link className="inline-flex min-h-11 items-center rounded-sm hover:text-white focus-visible:outline-2 focus-visible:outline-violet-300" href={`/clubs/${clubId}/movie-nights/${movieNight.movieNightId}/admin`}>Manage this night</Link> : null}
-            </nav>
             {hasPlanNotice ? (
               <StatusAlert tone="warning" className="mb-5">
                 <div className="space-y-3 break-words">
@@ -273,7 +273,7 @@ export default function ActiveClubPage() {
                     hasVote={hasSavedVote}
                     votingOpen={isVoting}
                     votingClosesAt={movieNight.votingClosesAt}
-                    historyHref={`/clubs/${clubId}/history`}
+                    historyHref={`/clubs/${encodeURIComponent(clubId)}/history`}
                   />
                 </div>
               </section>

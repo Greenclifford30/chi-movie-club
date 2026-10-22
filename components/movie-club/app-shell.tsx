@@ -12,11 +12,15 @@ import type { Club } from "@/lib/movie-club-types";
 
 export function ProtectedPage({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) router.replace("/sign-in");
-  }, [isAuthenticated, isLoading, router]);
+    if (!isLoading && !isAuthenticated) {
+      const destination = `${pathname}${window.location.search}${window.location.hash}`;
+      router.replace(`/sign-in?redirect=${encodeURIComponent(destination)}`);
+    }
+  }, [isAuthenticated, isLoading, pathname, router]);
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -35,11 +39,15 @@ export function ProtectedPage({ children }: { children: React.ReactNode }) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const params = useParams<{ clubId?: string }>();
+  const params = useParams<{ clubId?: string; movieNightId?: string }>();
   const pathname = usePathname();
   const router = useRouter();
   const { email, token, signOut } = useAuth();
   const clubId = params.clubId || process.env.NEXT_PUBLIC_DEFAULT_CLUB_ID;
+  const clubPath = clubId ? `/clubs/${encodeURIComponent(clubId)}` : "";
+  const isEventPage = Boolean(params.movieNightId) || pathname === `${clubPath}/movie-nights/new`;
+  const isEventAdmin = isEventPage && (pathname.endsWith("/admin") || pathname.endsWith("/new"));
+  const activePath = isEventPage ? `${clubPath}${isEventAdmin ? "/admin" : ""}` : pathname;
   const [club, setClub] = useState<Club | null>(null);
 
   useEffect(() => {
@@ -57,10 +65,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [token, clubId]);
 
   const navigation = clubId ? [
-    { href: `/clubs/${clubId}`, label: "Schedule", shortLabel: "Schedule", icon: CalendarDays },
-    { href: `/clubs/${clubId}/suggestions`, label: "Film suggestions", shortLabel: "Suggest", icon: Lightbulb },
-    { href: `/clubs/${clubId}/history`, label: "History", shortLabel: "History", icon: History },
-    ...(club?.role === "admin" || !club ? [{ href: `/clubs/${clubId}/admin`, label: "Manage", shortLabel: "Manage", icon: ShieldCheck }] : []),
+    { href: clubPath, label: "Schedule", shortLabel: "Schedule", icon: CalendarDays },
+    { href: `${clubPath}/suggestions`, label: "Film suggestions", shortLabel: "Suggest", icon: Lightbulb },
+    { href: `${clubPath}/history`, label: "History", shortLabel: "History", icon: History },
+    ...(club?.role === "admin" ? [{ href: `${clubPath}/admin`, label: "Manage", shortLabel: "Manage", icon: ShieldCheck }] : []),
   ] : [];
   navigation.push({ href: "/my-movie-nights", label: "My movie nights", shortLabel: "Agenda", icon: CalendarDays });
 
@@ -73,12 +81,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-50 border-b border-white/[.08] bg-[#0b101c]/95 backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-5">
-              <Link href="/clubs" className="flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight text-white transition hover:text-violet-200" aria-label="Movie Club, all clubs">
+              <Link href="/clubs" className="flex min-h-11 shrink-0 items-center gap-2 text-sm font-semibold tracking-tight text-white transition hover:text-violet-200" aria-label="Movie Club, all clubs">
                 <span className="grid size-8 place-items-center rounded-md bg-violet-400/15 text-violet-200"><Film className="size-4" /></span>
                 <span className="hidden sm:inline">Movie Club</span>
               </Link>
               {clubId ? (
-                <Link href="/clubs" className="flex min-w-0 items-center gap-2 border-l border-white/10 pl-4 text-sm text-slate-300 transition hover:text-white" title="Switch club">
+                <Link href="/clubs" className="flex min-h-11 min-w-0 items-center gap-2 border-l border-white/10 pl-4 text-sm text-slate-300 transition hover:text-white" title="Switch club">
                   <ArrowLeft className="size-3.5 shrink-0 text-slate-500" />
                   <span className="truncate font-medium">{club?.name || "All clubs"}</span>
                 </Link>
@@ -86,7 +94,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {navigation.length ? (
                 <nav aria-label="Club pages" className="ml-2 hidden shrink-0 items-center gap-1 lg:flex">
                   {navigation.map((item) => {
-                    const active = pathname === item.href;
+                    const active = activePath === item.href;
                     return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition ${active ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><span className="xl:hidden">{item.shortLabel}</span><span className="hidden xl:inline">{item.label}</span></Link>;
                   })}
                 </nav>
@@ -94,21 +102,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <NotificationBell />
-              <Button asChild variant="ghost" size="icon" title="Account settings" className={pathname === "/settings" ? "bg-white/10 text-white" : "text-slate-300"}>
+              <Button asChild variant="ghost" size="icon" title="Account settings" className={`md:size-11 ${pathname === "/settings" ? "bg-white/10 text-white" : "text-slate-300"}`}>
                 <Link href="/settings"><Settings className="size-4" /><span className="sr-only">Account settings</span></Link>
               </Button>
-              <Button variant="ghost" size="icon" title={email ? `Sign out ${email}` : "Sign out"} className="text-slate-300" onClick={() => { signOut(); router.replace("/sign-in"); }}>
+              <Button variant="ghost" size="icon" title={email ? `Sign out ${email}` : "Sign out"} className="md:size-11 text-slate-300" onClick={() => { signOut(); router.replace("/sign-in"); }}>
                 <LogOut className="size-4" /><span className="sr-only">Sign out</span>
               </Button>
             </div>
           </div>
+          {isEventPage ? (
+            <nav aria-label="Movie night navigation" className="mx-auto flex max-w-7xl flex-wrap gap-x-5 border-t border-white/5 px-4 text-sm text-cyan-200 sm:px-6 lg:px-8">
+              <Link href={clubPath} className="inline-flex min-h-11 items-center gap-2"><ArrowLeft aria-hidden="true" className="size-4" />Club schedule</Link>
+              {isEventAdmin && params.movieNightId ? <Link href={`${clubPath}/movie-nights/${encodeURIComponent(params.movieNightId)}`} className="inline-flex min-h-11 items-center">View movie night</Link> : null}
+            </nav>
+          ) : null}
         </header>
         <main id="main-content" tabIndex={-1} className="outline-none">{children}</main>
         {navigation.length ? (
           <nav aria-label="Club navigation" className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#0b101c]/97 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
             <div className="mx-auto grid h-[4.5rem] max-w-lg grid-flow-col auto-cols-fr px-2">
               <MobileLink href="/clubs" label="Clubs" icon={Film} active={pathname === "/clubs"} />
-              {navigation.map((item) => <MobileLink key={item.href} href={item.href} label={item.shortLabel} icon={item.icon} active={pathname === item.href} />)}
+              {navigation.map((item) => <MobileLink key={item.href} href={item.href} label={item.shortLabel} icon={item.icon} active={activePath === item.href} />)}
             </div>
           </nav>
         ) : null}
@@ -118,7 +132,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function MobileLink({ href, label, icon: Icon, active }: { href: string; label: string; icon: typeof Film; active: boolean }) {
-  return <Link href={href} aria-current={active ? "page" : undefined} className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-lg text-xs font-medium transition ${active ? "text-violet-200" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+  return <Link href={href} aria-current={active ? "page" : undefined} className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg text-xs font-medium transition ${active ? "text-violet-200" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
     <Icon className="size-5" /><span>{label}</span>
   </Link>;
 }
