@@ -32,15 +32,9 @@ export function RankedChoicePicker({
   onSave: () => void;
 }) {
   const selectedCount = rankings.filter(Boolean).length;
-  const selectedShowtimes = rankings
-    .map((ranking) => showtimes.find((showtime) => showtime.showtimeId === ranking))
-    .filter(Boolean) as Showtime[];
 
   return (
     <div className="space-y-4">
-      <div className="border-l-2 border-violet-300/60 pl-3 text-sm text-slate-300">
-        Pick up to three different showtimes. You can edit your saved vote while voting is open.
-      </div>
       {rankLabels.map((rank, index) => {
         const unavailable = rankings.filter((value, valueIndex) => value && valueIndex !== index);
         return (
@@ -49,14 +43,14 @@ export function RankedChoicePicker({
               <span id={`rank-${index}-label`} className="text-sm font-medium text-slate-200">{rank.label}</span>
               <span className="text-xs text-slate-500">{rank.points}</span>
             </div>
-            <Select value={rankings[index] || "none"} onValueChange={(value) => onChange(index, value)} disabled={disabled}>
-              <SelectTrigger aria-labelledby={`rank-${index}-label`} className="w-full border-white/10 bg-white/5 text-slate-100">
+            <Select value={rankings[index] || "none"} onValueChange={(value) => onChange(index, value)} disabled={disabled || isSaving}>
+              <SelectTrigger aria-labelledby={`rank-${index}-label`} className="min-h-11 w-full min-w-0 border-white/10 bg-white/5 text-left whitespace-normal text-slate-100 data-[size=default]:h-auto md:data-[size=default]:h-auto [&_[data-slot=select-value]]:line-clamp-none [&_[data-slot=select-value]]:block [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:flex-1 [&_[data-slot=select-value]]:[overflow-wrap:anywhere]">
                 <SelectValue placeholder="Choose a showtime" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)]">
                 <SelectItem value="none">No selection</SelectItem>
                 {showtimes.map((showtime) => (
-                  <SelectItem key={showtime.showtimeId} value={showtime.showtimeId} disabled={unavailable.includes(showtime.showtimeId)}>
+                  <SelectItem className="min-h-11 whitespace-normal [overflow-wrap:anywhere] [&>span:last-child]:min-w-0" key={showtime.showtimeId} value={showtime.showtimeId} disabled={unavailable.includes(showtime.showtimeId)}>
                     {showtimeLabel(showtime)}
                   </SelectItem>
                 ))}
@@ -65,21 +59,10 @@ export function RankedChoicePicker({
           </div>
         );
       })}
-      {selectedShowtimes.length ? (
-        <ol className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-          {selectedShowtimes.map((showtime, index) => (
-            <li key={showtime.showtimeId} className="flex gap-2 py-1">
-              <span className="text-violet-300">{index + 1}.</span>
-              <span>{showtimeLabel(showtime)}</span>
-            </li>
-          ))}
-        </ol>
-      ) : null}
-      <Button className={`${hideMobileSave ? "hidden md:flex" : ""} w-full bg-violet-400 text-slate-950 hover:bg-violet-300`} disabled={disabled || !selectedCount || isSaving} onClick={onSave}>
+      <Button className={`${hideMobileSave ? "hidden lg:flex" : ""} min-h-11 w-full bg-violet-400 text-slate-950 hover:bg-violet-300`} disabled={disabled || !selectedCount || isSaving} onClick={onSave}>
         {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}
         {hasSavedVote ? "Update ranked vote" : "Save ranked vote"}
       </Button>
-      {disabled ? <p className="text-xs text-slate-500">Voting is locked until the event is open for member ballots.</p> : null}
     </div>
   );
 }

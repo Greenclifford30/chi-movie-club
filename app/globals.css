@@ -224,6 +224,14 @@ button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
 button:not(:disabled):active, a:active { transform: translateY(1px); }
 .mc-page { width: min(100%, 80rem); margin-inline: auto; padding: 2rem 1rem 7rem; }
 .mc-page-narrow { width: min(100%, 48rem); }
+.mc-night-page { overflow-wrap: anywhere; }
+.mc-night-page :is(button, a, summary, [tabindex]) { scroll-margin-top: 6rem; }
+@media (max-width: 1023px) {
+  .mc-night-page.mc-night-has-actions { padding-bottom: 6rem; }
+  html:has(.mc-night-page) { scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+  html:has(.mc-night-has-actions) { scroll-padding-bottom: calc(10rem + env(safe-area-inset-bottom)); }
+  .mc-night-page :is(button, a, summary, [tabindex]) { scroll-margin-bottom: calc(10rem + env(safe-area-inset-bottom)); }
+}
 .mc-eyebrow { color: #b8a5f8; font-size: .75rem; font-weight: 650; letter-spacing: .16em; text-transform: uppercase; }
 .mc-title { color: #f8fafc; font-size: clamp(2.1rem, 4vw, 3.4rem); font-weight: 650; letter-spacing: -.055em; line-height: 1.04; text-wrap: balance; }
 .mc-panel { background: rgba(20, 27, 41, .85); border: 1px solid rgba(148, 163, 184, .11); border-radius: 1rem; }

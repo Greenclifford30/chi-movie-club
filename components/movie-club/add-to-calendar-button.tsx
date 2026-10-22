@@ -43,8 +43,8 @@ export function AddToCalendarButton({ movieNight, showtime, status, token, ident
       setError(downloadError instanceof MovieClubApiError ? downloadError.message : "Unable to download the calendar file.");
     } finally { setLoading(false); }
   }
-  return <div className="flex w-full flex-col items-stretch gap-1 md:w-auto md:items-end">
-    <Button type="button" onClick={handleDownload} disabled={loading} variant="outline" aria-label={status === "cancelled" ? "Download cancelled Movie Night calendar entry" : (movieNight.planRevision ?? 1) > 1 ? "Download updated Movie Night calendar entry" : identityProvider === "google" ? "Add this confirmed Movie Night to Google Calendar" : "Add this confirmed Movie Night to your calendar"} className="min-h-11 w-full border-green-300/30 bg-white/5 text-green-50 hover:bg-green-400/10 md:w-auto">
+  return <div className="flex w-full min-w-0 flex-col items-stretch gap-2">
+    <Button type="button" onClick={handleDownload} disabled={loading} variant="outline" aria-label={status === "cancelled" ? "Download cancelled Movie Night calendar entry" : (movieNight.planRevision ?? 1) > 1 ? "Download updated Movie Night calendar entry" : identityProvider === "google" ? "Add this confirmed Movie Night to Google Calendar" : "Add this confirmed Movie Night to your calendar"} className="h-auto min-h-11 w-full whitespace-normal border-green-300/30 bg-white/5 text-green-50 hover:bg-green-400/10">
       {loading ? <Loader2 className="size-4 animate-spin" /> : <CalendarPlus className="size-4" />} {status === "cancelled" ? "Download cancelled calendar entry" : (movieNight.planRevision ?? 1) > 1 ? "Download updated calendar entry" : identityProvider === "google" ? "Add to Google Calendar" : "Add to calendar"}
     </Button>
     <p className="max-w-sm text-xs text-slate-400">Calendar imports do not update automatically. Update or remove your previous entry when the plan changes.</p>

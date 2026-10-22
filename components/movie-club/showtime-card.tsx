@@ -14,7 +14,7 @@ export function ShowtimeCard({ theaterName, theaterLocation, dateTime, screenFor
   compact?: boolean;
   onSelect?: () => void;
 }) {
-  const className = `w-full rounded-lg border p-4 text-left transition-[background-color,border-color,transform] duration-200 ${selected ? "border-violet-300/50 bg-violet-400/10" : "border-white/10 bg-white/[.03]"} ${onSelect ? "cursor-pointer hover:-translate-y-0.5 hover:border-violet-300/50 hover:bg-violet-400/[.08] focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950" : ""}`;
+  const className = `w-full min-w-0 break-words rounded-lg border p-4 text-left transition-[background-color,border-color,transform] duration-200 ${selected ? "border-violet-300/50 bg-violet-400/10" : "border-white/10 bg-white/[.03]"} ${onSelect ? "cursor-pointer hover:-translate-y-0.5 hover:border-violet-300/50 hover:bg-violet-400/[.08] focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950" : ""}`;
   const content = (
     <div className="flex items-start gap-3">
       {rank ? <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-violet-300/15 text-sm font-semibold text-violet-100">{rank}</div> : selected ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-violet-200" /> : null}
@@ -26,8 +26,8 @@ export function ShowtimeCard({ theaterName, theaterLocation, dateTime, screenFor
           </div>
           <span className="rounded bg-cyan-400/10 px-2 py-1 text-xs font-medium text-slate-200">{screenFormat || "Standard"}</span>
         </div>
-        {theaterName ? <p className="mt-3 truncate text-sm font-medium text-slate-100">{theaterName}</p> : null}
-        {theaterLocation && !compact ? <p className="mt-1 flex items-center gap-2 text-xs text-slate-400"><MapPin className="size-3.5 shrink-0" /><span className="truncate">{theaterLocation}</span></p> : null}
+        {theaterName ? <p className="mt-3 text-sm font-medium text-slate-100">{theaterName}</p> : null}
+        {theaterLocation && !compact ? <p className="mt-1 flex items-start gap-2 text-xs text-slate-400"><MapPin className="mt-0.5 size-3.5 shrink-0" /><span className="min-w-0">{theaterLocation}</span></p> : null}
         {ticketURI ? <p className="mt-3 flex items-center gap-1.5 text-xs text-violet-200"><ExternalLink className="size-3.5" />Tickets linked</p> : null}
       </div>
     </div>
