@@ -38,7 +38,7 @@ export function ProtectedPage({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, movieNightNavigation }: { children: React.ReactNode; movieNightNavigation?: React.ReactNode }) {
   const params = useParams<{ clubId?: string; movieNightId?: string }>();
   const pathname = usePathname();
   const router = useRouter();
@@ -110,12 +110,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Button>
             </div>
           </div>
-          {isEventPage ? (
+          {movieNightNavigation || (isEventPage ? (
             <nav aria-label="Movie night navigation" className="mx-auto flex max-w-7xl flex-wrap gap-x-5 border-t border-white/5 px-4 text-sm text-cyan-200 sm:px-6 lg:px-8">
               <Link href={clubPath} className="inline-flex min-h-11 items-center gap-2"><ArrowLeft aria-hidden="true" className="size-4" />Club schedule</Link>
               {isEventAdmin && params.movieNightId ? <Link href={`${clubPath}/movie-nights/${encodeURIComponent(params.movieNightId)}`} className="inline-flex min-h-11 items-center">View movie night</Link> : null}
             </nav>
-          ) : null}
+          ) : null)}
         </header>
         <main id="main-content" tabIndex={-1} className="outline-none">{children}</main>
         {navigation.length ? (

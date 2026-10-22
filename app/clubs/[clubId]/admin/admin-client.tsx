@@ -2,11 +2,8 @@
 
 import {
   BellRing,
-  CalendarClock,
   Check,
   CheckCircle2,
-  Clapperboard,
-  ClipboardCheck,
   Clock,
   Copy,
   Film,
@@ -16,23 +13,19 @@ import {
   RefreshCcw,
   Search,
   Share2,
-  ShieldCheck,
-  Ticket,
   Trash2,
-  Users,
   Vote,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { cloneElement, FocusEvent, FormEvent, ReactElement, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AdminStepCard } from "@/components/movie-club/admin-step-card";
 import { AppShell } from "@/components/movie-club/app-shell";
 import { AdminSectionNav, type AdminSection } from "@/components/movie-club/admin-section-nav";
 import { PageSkeleton } from "@/components/movie-club/page-skeleton";
 import { ConfirmedPlanCard } from "@/components/movie-club/confirmed-plan-card";
 import { EmptyState } from "@/components/movie-club/empty-state";
-import { ShowtimeCard } from "@/components/movie-club/showtime-card";
 import { StatusAlert } from "@/components/movie-club/status-alert";
 import {
   DEFAULT_PLANNING_RADIUS,
@@ -99,16 +92,6 @@ type TheaterShowtimeGroup<T extends TheaterLikeShowtime> = {
   showtimes: T[];
 };
 
-const progressSteps = [
-  { label: "Movie", icon: Clapperboard },
-  { label: "Planning", icon: CalendarClock },
-  { label: "Showtimes", icon: Ticket },
-  { label: "Voting", icon: Vote },
-  { label: "Results", icon: ClipboardCheck },
-  { label: "Confirm", icon: ShieldCheck },
-  { label: "Attendance", icon: Users },
-];
-
 const showtimeTimeBuckets: { value: ShowtimeTimeBucket; label: string }[] = [
   { value: "all", label: "All" },
   { value: "morning", label: "Morning" },
@@ -125,6 +108,34 @@ export default function ClubAdminPage() {
   const lifecyclePending = useRef(false);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [changeReason, setChangeReason] = useState("");
+  const [isChangingPlan, setIsChangingPlan] = useState(false);
+  const [copyFallback, setCopyFallback] = useState<ClubInvite | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, { error?: string | null; message?: string | null }>>({});
+  function feedbackFor(target: string) {
+    return {
+      setError: (error: string | null) => setFeedback(current => ({ ...current, [target]: { ...current[target], error, ...(error ? { message: null } : {}) } })),
+      setMessage: (message: string | null) => setFeedback(current => ({ ...current, [target]: { ...current[target], message, ...(message ? { error: null } : {}) } })),
+    };
+  }
+  function actionFeedback(target: string) {
+    return <ActionFeedback feedback={feedback[target]} />;
+  }
+  function keepFocusVisible(event: FocusEvent<HTMLDivElement>) {
+    const control = event.target;
+    if (!control.matches("a, button, input, select, textarea, summary")) return;
+    window.requestAnimationFrame(() => {
+      if (!control.isConnected || !control.getClientRects().length) return;
+      const bounds = control.getBoundingClientRect();
+      const top = document.querySelector("header.sticky")?.getBoundingClientRect().bottom || 0;
+      const bottomBars = [
+        document.querySelector('nav[aria-label="Club navigation"]'),
+        document.querySelector('[aria-label="Showtime review actions"]'),
+      ].filter((bar): bar is Element => Boolean(bar?.getClientRects().length && !bar.contains(control)));
+      const bottom = Math.min(window.innerHeight, ...bottomBars.map(bar => bar.getBoundingClientRect().top));
+      const offset = bounds.bottom > bottom - 12 ? bounds.bottom - bottom + 12 : bounds.top < top + 12 ? bounds.top - top - 12 : 0;
+      if (offset) window.scrollBy({ top: offset, behavior: "instant" });
+    });
+  }
   function retryKey(action: string, payload: unknown) {
     const fingerprint = JSON.stringify([action, routeMovieNightId, payload]);
     if (!retryKeys.current.has(fingerprint)) retryKeys.current.set(fingerprint, crypto.randomUUID());
@@ -156,6 +167,7 @@ export default function ClubAdminPage() {
     preferredTheaterIds: [],
   });
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
+  const [candidateStatusFilter, setCandidateStatusFilter] = useState("all");
   const [candidateDateFilter, setCandidateDateFilter] = useState("all");
   const [candidateTheaterFilter, setCandidateTheaterFilter] = useState("all");
   const [candidateFormatFilter, setCandidateFormatFilter] = useState("all");
@@ -171,12 +183,14 @@ export default function ClubAdminPage() {
   const [refreshState, setRefreshState] = useState<ActionState>("idle");
   const [importState, setImportState] = useState<ActionState>("idle");
   const [planningState, setPlanningState] = useState<ActionState>("idle");
+  const [candidateFeedbackId, setCandidateFeedbackId] = useState<string | null>(null);
   const [candidateState, setCandidateState] = useState<ActionState>("idle");
   const [votingState, setVotingState] = useState<ActionState>("idle");
   const [votingClosesAt, setVotingClosesAt] = useState("");
   const [inviteState, setInviteState] = useState<ActionState>("idle");
   const [shareInviteState, setShareInviteState] = useState<ActionState>("idle");
   const [inviteClearState, setInviteClearState] = useState<ActionState>("idle");
+  const [confirmingShowtimeId, setConfirmingShowtimeId] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ActionState>("idle");
   const [completeState, setCompleteState] = useState<ActionState>("idle");
   const [cancelState, setCancelState] = useState<ActionState>("idle");
@@ -196,6 +210,7 @@ export default function ClubAdminPage() {
       return;
     }
     try {
+      setError(null);
       if (!routeMovieNightId) throw new MovieClubApiError("Choose an event from the schedule or create a new movie night.", 404);
       const nextActive = await getMovieNight(token, routeMovieNightId);
       if (nextActive.movieNight.clubId !== clubId) throw new MovieClubApiError("Movie night does not belong to this club.", 403);
@@ -226,7 +241,7 @@ export default function ClubAdminPage() {
           setResults(await getVoteResults(token, nextActive.movieNight.movieNightId));
         } catch (resultsError) {
           setResults(null);
-          setError(resultsError instanceof Error ? resultsError.message : "Unable to load vote results.");
+          feedbackFor("results").setError(resultsError instanceof Error ? resultsError.message : "Unable to load vote results.");
         }
       } else {
         setResults(null);
@@ -259,6 +274,7 @@ export default function ClubAdminPage() {
   }
 
   async function loadInvites() {
+    const { setError } = feedbackFor("invites");
     if (!token) {
       return;
     }
@@ -274,6 +290,7 @@ export default function ClubAdminPage() {
   }
 
   async function loadMembers() {
+    const { setError } = feedbackFor("members");
     if (!token) return;
     try {
       const result = await listClubMembers(token, clubId);
@@ -287,6 +304,7 @@ export default function ClubAdminPage() {
   }
 
   async function loadAttendance(movieNightId: string) {
+    const { setError } = feedbackFor("attendance");
     if (!token) return;
     try {
       setAttendance(await getAttendance(token, movieNightId));
@@ -299,6 +317,7 @@ export default function ClubAdminPage() {
   }
 
   async function loadNowPlaying() {
+    const { setError } = feedbackFor("discovery");
     if (!token) {
       return;
     }
@@ -338,12 +357,13 @@ export default function ClubAdminPage() {
   }, [active?.movieNight.movieNightId, active?.movieNight.showtimeImportStatus, token]);
 
   useEffect(() => {
-    if (active?.movieNight.status === "confirmed") void loadAttendance(active.movieNight.movieNightId);
+    if (active?.movieNight.status === "confirmed" || active?.movieNight.status === "completed") void loadAttendance(active.movieNight.movieNightId);
     else setAttendance(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.movieNight.movieNightId, active?.movieNight.status, token]);
 
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
+    const { setError, setMessage } = feedbackFor("search");
     event.preventDefault();
     if (!token || searchQuery.trim().length < 2) {
       return;
@@ -363,6 +383,7 @@ export default function ClubAdminPage() {
   }
 
   async function handleCreateMovieNight() {
+    const { setError, setMessage } = feedbackFor("setup");
     if (!token || !selectedMovie || !targetDate) {
       return;
     }
@@ -418,6 +439,7 @@ export default function ClubAdminPage() {
   }
 
   async function handleRefreshGracenote() {
+    const { setError, setMessage } = feedbackFor("recovery");
     if (!token) {
       return;
     }
@@ -435,11 +457,11 @@ export default function ClubAdminPage() {
       };
       await refreshGracenote(token, searchForm);
       setRefreshState("saved");
-      setMessage("Provider refresh queued. Searching the cache for new matches…");
+      setMessage("Theater listings refresh requested. Searching for new matches…");
       await searchCachedShowtimesWithRetry(15);
     } catch (refreshError) {
       setRefreshState("error");
-      setError(refreshError instanceof Error ? refreshError.message : "Unable to queue Gracenote refresh.");
+      setError(refreshError instanceof Error ? refreshError.message : "Unable to refresh theater listings. Try again.");
     }
   }
 
@@ -449,8 +471,9 @@ export default function ClubAdminPage() {
   }
 
   async function searchCachedShowtimesWithRetry(attempts: number) {
+    const { setError, setMessage } = feedbackFor("recovery");
     if (!token || !movieNight?.movie) {
-      setError("Create a movie night before searching cached showtimes.");
+      setError("Create a movie night before searching available showtimes.");
       return;
     }
 
@@ -478,19 +501,20 @@ export default function ClubAdminPage() {
         if (result.showtimes.length) {
           setCachedShowtimes(result.showtimes);
           setGracenoteState("idle");
-          setMessage(`${result.showtimes.length} cached showtime${result.showtimes.length === 1 ? "" : "s"} found for ${movieNight.movie.title}.`);
+          setMessage(`${result.showtimes.length} available showtime${result.showtimes.length === 1 ? "" : "s"} found for ${movieNight.movie.title}.`);
           return;
         }
       }
       setGracenoteState("idle");
-      setMessage(`No cached matches are ready for ${movieNight.movie.title}. The provider may still be refreshing; use Search again shortly.`);
+      setMessage(`No matches are ready for ${movieNight.movie.title}. Theater listings may still be updating; use Search again shortly.`);
     } catch (searchError) {
       setGracenoteState("error");
-      setError(searchError instanceof Error ? searchError.message : "Unable to search cached Gracenote showtimes.");
+      setError(searchError instanceof Error ? searchError.message : "Unable to search theater listings. Try again.");
     }
   }
 
   async function handleImportShowtimes() {
+    const { setError, setMessage } = feedbackFor("recovery");
     if (!token || !movieNight || !selectedCachedKeys.length) {
       return;
     }
@@ -515,6 +539,7 @@ export default function ClubAdminPage() {
   }
 
   async function handleSavePlanning() {
+    const { setError, setMessage } = feedbackFor("planning");
     if (!token || !movieNight) {
       return;
     }
@@ -543,6 +568,7 @@ export default function ClubAdminPage() {
   }
 
   async function handleBackendImportShowtimes() {
+    const { setError, setMessage } = feedbackFor("import");
     if (!token || !movieNight) {
       return;
     }
@@ -571,6 +597,8 @@ export default function ClubAdminPage() {
   }
 
   async function handleCandidateStatus(showtimeId: string, status: "approved" | "rejected") {
+    setCandidateFeedbackId(showtimeId);
+    const { setError, setMessage } = feedbackFor("candidates");
     if (!token || !movieNight) {
       return;
     }
@@ -593,6 +621,8 @@ export default function ClubAdminPage() {
   }
 
   async function handleBulkApproveCandidates() {
+    setCandidateFeedbackId(null);
+    const { setError, setMessage } = feedbackFor("candidates");
     if (!token || !movieNight || !selectedCandidateIds.length) {
       return;
     }
@@ -612,6 +642,7 @@ export default function ClubAdminPage() {
   }
 
   async function handleOpenVoting() {
+    const { setError, setMessage } = feedbackFor("voting");
     if (!token || !movieNight) {
       return;
     }
@@ -636,6 +667,7 @@ export default function ClubAdminPage() {
   }
 
   async function handleCloseVoting() {
+    const { setError, setMessage } = feedbackFor("voting");
     if (!token || !movieNight || !window.confirm("Close voting now? Members will no longer be able to edit ballots.")) return;
     setVotingState("saving");
     setError(null);
@@ -667,9 +699,11 @@ export default function ClubAdminPage() {
   }
 
   async function handleConfirm(showtimeId: string) {
+    const { setError, setMessage } = feedbackFor("results");
     if (!token || !active?.movieNight) {
       return;
     }
+    setConfirmingShowtimeId(showtimeId);
     const isChangingConfirmedShowtime = active.movieNight.status === "confirmed";
     let confirmationMessage = isChangingConfirmedShowtime
       ? "Change the confirmed club plan to this showtime? Members will be notified of the update and may need to update their RSVP."
@@ -677,6 +711,7 @@ export default function ClubAdminPage() {
     setConfirmState("saving");
     try {
       const selected = active.showtimes.find(s => s.showtimeId === showtimeId);
+      if (selected) confirmationMessage = `${active.movieNight.movie.title}\n${selected.theaterName}\n${formatVotingDeadline(selected.startsAtUtc, active.movieNight.timezone)}\n${selected.screenFormat || "Standard"}\n\n${confirmationMessage}`;
       if (selected) {
         const others = [];
         let cursor: string | undefined;
@@ -696,6 +731,8 @@ export default function ClubAdminPage() {
     try {
       await confirmShowtime(token, active.movieNight.movieNightId, showtimeId, { expectedVersion: active.movieNight.version ?? 0, changeReason, idempotencyKey: retryKey("confirm", [showtimeId, active.movieNight.version ?? 0, changeReason]) });
       setConfirmState("saved");
+      setIsChangingPlan(false);
+      setChangeReason("");
       setMessage(isChangingConfirmedShowtime ? "Confirmed showtime updated. Members have been notified of the change." : "Final showtime confirmed. Members can RSVP and track tickets now.");
       await loadActive();
     } catch (confirmError) {
@@ -757,6 +794,7 @@ export default function ClubAdminPage() {
   }
 
   async function handleTestNotification() {
+    const { setError, setMessage } = feedbackFor("notification");
     if (!token) return;
     setTestNotificationState("saving");
     setError(null);
@@ -764,16 +802,17 @@ export default function ClubAdminPage() {
     try {
       const result = await sendTestNotification(token, clubId);
       setTestNotificationState("saved");
-      setMessage(`${result.message} Tracking ID: ${result.eventId}. Check your activity inbox, email, and enabled browser push notifications.`);
+      setMessage(`${result.message} Check your activity inbox, email, and enabled browser notifications.`);
     } catch (testError) {
       setTestNotificationState("error");
       setError(testError instanceof MovieClubApiError && testError.status === 404
-        ? "The test-notification endpoint has not been deployed yet. Deploy the cmc-manage-notifications-lambda, then try again."
+        ? "Test notifications are temporarily unavailable. Try again later."
         : testError instanceof Error ? testError.message : "Unable to queue a test notification.");
     }
   }
 
   async function handleCreateInvites(event: FormEvent<HTMLFormElement>) {
+    const { setError, setMessage } = feedbackFor("invites");
     event.preventDefault();
     if (!token) {
       return;
@@ -816,6 +855,7 @@ export default function ClubAdminPage() {
   }
 
   async function handleCreateShareableInvite() {
+    const { setError, setMessage } = feedbackFor("invites");
     if (!token) return;
 
     setShareInviteState("saving");
@@ -846,16 +886,26 @@ export default function ClubAdminPage() {
   }
 
   async function handleCopyInvite(invite: ClubInvite) {
-    if (!invite.inviteUrl) {
-      return;
+    if (!invite.inviteUrl) return;
+    const { setError, setMessage } = feedbackFor("invites");
+    setError(null);
+    setMessage(null);
+    setCopiedInviteId(null);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Copy unavailable");
+      await navigator.clipboard.writeText(invite.inviteUrl);
+      setCopyFallback(null);
+      setCopiedInviteId(invite.inviteId);
+      setMessage(invite.email ? `Invite link copied for ${invite.email}.` : "Share link copied.");
+      window.setTimeout(() => setCopiedInviteId(null), 1800);
+    } catch {
+      setCopyFallback(invite);
+      setError("Automatic copying is unavailable. Select and copy the invite link below.");
     }
-    await navigator.clipboard?.writeText(invite.inviteUrl);
-    setCopiedInviteId(invite.inviteId);
-    setMessage(invite.email ? `Invite link copied for ${invite.email}.` : "Share link copied.");
-    window.setTimeout(() => setCopiedInviteId(null), 1800);
   }
 
   async function handleShareInvite(invite: ClubInvite) {
+    const { setError, setMessage } = feedbackFor("invites");
     if (!invite.inviteUrl || typeof navigator.share !== "function") {
       return;
     }
@@ -873,6 +923,7 @@ export default function ClubAdminPage() {
   }
 
   async function handleRevokeInvite(invite: ClubInvite) {
+    const { setError, setMessage } = feedbackFor("invites");
     if (!token || !window.confirm(`Revoke the invite for ${invite.email || "this shareable link"}? Anyone with this link will no longer be able to join.`)) return;
 
     setInviteClearState("saving");
@@ -881,6 +932,7 @@ export default function ClubAdminPage() {
     try {
       await revokeClubInvite(token, clubId, invite.inviteId);
       setInvites((current) => current.filter((currentInvite) => currentInvite.inviteId !== invite.inviteId));
+      if (copyFallback?.inviteId === invite.inviteId) setCopyFallback(null);
       setInviteClearState("saved");
       setMessage("Invite revoked.");
     } catch (inviteError) {
@@ -890,6 +942,7 @@ export default function ClubAdminPage() {
   }
 
   async function handleClearAllInvites() {
+    const { setError, setMessage } = feedbackFor("invites");
     if (!token || !invites.length || !window.confirm(`Clear all ${invites.length} pending invite${invites.length === 1 ? "" : "s"}? Existing links will stop working.`)) return;
 
     setInviteClearState("saving");
@@ -898,6 +951,7 @@ export default function ClubAdminPage() {
     try {
       const { revokedCount } = await revokeAllClubInvites(token, clubId);
       setInvites([]);
+      setCopyFallback(null);
       setInviteClearState("saved");
       setMessage(`${revokedCount} pending invite${revokedCount === 1 ? "" : "s"} cleared.`);
     } catch (inviteError) {
@@ -907,6 +961,14 @@ export default function ClubAdminPage() {
   }
 
   const movieNight = active?.movieNight;
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    if (movieNight?.status !== "voting" || movieNight.votingClosedAt || !movieNight.votingClosesAt) return;
+    const remaining = Date.parse(movieNight.votingClosesAt) - Date.now();
+    if (!Number.isFinite(remaining) || remaining <= 0) return;
+    const timer = window.setTimeout(() => setClockTick(tick => tick + 1), Math.min(remaining + 50, 2_147_000_000));
+    return () => window.clearTimeout(timer);
+  }, [movieNight?.status, movieNight?.votingClosedAt, movieNight?.votingClosesAt, clockTick]);
   const hasUnsavedPlanning = Boolean(movieNight && (
     planningForm.targetDate !== (movieNight.targetDate || "") ||
     planningForm.dateWindowStart !== (movieNight.dateWindowStart || "") ||
@@ -919,7 +981,7 @@ export default function ClubAdminPage() {
   const currentShowtimes = active?.showtimes || [];
   const lifecycleBusy = completeState === "saving" || cancelState === "saving";
   const planningValidationError = validatePlanningLocation(planningForm.zipCode, planningForm.radiusMiles) || validatePlanningWindow(planningForm, today);
-  const showImportRecovery = Boolean(movieNight && (
+  const showImportRecovery = Boolean(movieNight && !["completed", "cancelled"].includes(movieNight.status) && (
     movieNight.showtimeImportStatus === "failed" ||
     (movieNight.showtimeImportStatus === "completed" && currentShowtimes.length === 0)
   ));
@@ -937,7 +999,7 @@ export default function ClubAdminPage() {
     candidateDateFilter,
     candidateTheaterFilter,
     candidateFormatFilter
-  );
+  ).filter(showtime => candidateStatusFilter === "all" || (showtime.status || "approved") === candidateStatusFilter);
   const visibleCachedShowtimes = useMemo(
     () => filterCachedShowtimes(cachedShowtimes, selectedShowtimeDate, showtimeTimeBucket),
     [cachedShowtimes, selectedShowtimeDate, showtimeTimeBucket]
@@ -960,37 +1022,29 @@ export default function ClubAdminPage() {
     hasSelectedMovie: Boolean(selectedMovie),
     showtimeCount: approvedCandidates.length,
     status: movieNight?.status,
-    resultCount: results?.standings?.length || 0,
-  });
-  const completedProgress = getCompletedProgress({
-    hasMovieNight: Boolean(movieNight),
-    hasSelectedMovie: Boolean(selectedMovie),
-    showtimeCount: approvedCandidates.length,
-    status: movieNight?.status,
-    resultCount: results?.standings?.length || 0,
+    votingClosed: Boolean(movieNight && isVotingClosed(movieNight)),
   });
 
   useEffect(() => {
     if (isWorkspaceLoading) return;
-    if (movieNight?.status === "confirmed" || movieNight?.status === "voting" || (movieNight?.status === "planning" && approvedCandidates.length >= 2)) setActiveSection("voting");
+    if (movieNight?.status === "completed" || movieNight?.status === "cancelled" || movieNight?.status === "confirmed" || movieNight?.status === "voting" || (movieNight?.status === "planning" && approvedCandidates.length >= 2)) setActiveSection("voting");
     else if (approvedCandidates.length || movieNight) setActiveSection("showtimes");
   // The opening section is chosen once after the initial workspace load.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWorkspaceLoading]);
 
   const eventLinks = (
-    <nav aria-label="Admin movie night links" className="mb-5 flex flex-wrap gap-x-5 text-sm text-cyan-200">
+    <nav aria-label="Movie night navigation" className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-5 border-t border-white/5 px-4 text-sm text-cyan-200 sm:px-6 lg:px-8">
       <Link className="inline-flex min-h-11 items-center" href={`/clubs/${encodeURIComponent(clubId)}`}>Club schedule</Link>
-      <Link className="inline-flex min-h-11 items-center" href={`/clubs/${encodeURIComponent(clubId)}/movie-nights/new`}>Create a new movie night</Link>
       {routeMovieNightId ? <Link className="inline-flex min-h-11 items-center" href={`/clubs/${encodeURIComponent(clubId)}/movie-nights/${encodeURIComponent(routeMovieNightId)}`}>View movie night</Link> : null}
+      <Link className="inline-flex min-h-11 items-center text-slate-300 sm:ml-auto" href={`/clubs/${encodeURIComponent(clubId)}/movie-nights/new`}>Create a new movie night</Link>
     </nav>
   );
 
   if (isWorkspaceLoading) {
     return (
-      <AppShell>
-        <div className="mc-page">
-          {eventLinks}
+      <AppShell movieNightNavigation={eventLinks}>
+        <div className="mc-page mc-admin-page" onFocusCapture={keepFocusVisible}>
           <PageSkeleton variant="admin" label="Loading admin workspace" />
         </div>
       </AppShell>
@@ -998,59 +1052,56 @@ export default function ClubAdminPage() {
   }
 
   return (
-    <AppShell>
-      <div className="mc-page">
-        {eventLinks}
-        <section className="mb-6 border-b border-white/10 pb-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-3 flex items-center gap-2 text-sm text-cyan-300">
-                <CalendarClock className="size-4" />
-                <span>Club admin workspace</span>
-              </div>
-              <h1 className="mc-title">Manage movie night</h1>
-              <p className="mt-3 max-w-xl text-base leading-relaxed text-slate-300">{nextAction}</p>
-              <p className="mt-3 text-xs text-slate-500">
-                {movieNight?.updatedAt ? `Last updated ${formatDate(movieNight.updatedAt)}` : "No active movie night yet"}
-              </p>
+    <AppShell movieNightNavigation={eventLinks}>
+      <div className="mc-page mc-admin-page" onFocusCapture={keepFocusVisible}>
+        <header className="mb-5 border-b border-white/10 pb-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 basis-48">
+              <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Manage movie night</h1>
+              <p className="mt-2 break-words text-lg font-medium text-white">{movieNight?.movie.title || selectedMovie?.title || "Choose your next movie"}</p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[26rem]">
-              <Metric label="Status" value={statusLabel} tone={statusTone(movieNight?.status)} />
-              <Metric label="Movie" value={movieNight?.movie.title || selectedMovie?.title || "Choose a movie"} />
-              <Metric label="Date" value={formatDate(movieNight?.targetDate || targetDate)} />
-              <Metric label="Showtimes" value={`${candidateCounts.approved} approved`} />
-            </div>
+            {movieNight && ["planning", "voting", "confirmed"].includes(movieNight.status) ? (
+              <details className="group w-full rounded-lg border border-white/10 bg-slate-900/80 sm:w-auto sm:max-w-sm">
+                <summary className="min-h-11 cursor-pointer rounded-lg px-4 py-3 text-sm font-medium text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300">Event actions</summary>
+                <section aria-label="Event actions" className="space-y-3 border-t border-white/10 p-4">
+                  <p className="text-sm text-slate-300">{movieNight.status === "confirmed" ? "Ending this night moves it to club history and closes voting and RSVP. You can end it at any time." : "Cancel this night to close planning and voting. Club members will be notified."}</p>
+                  {lifecycleError ? <StatusAlert tone="danger">{lifecycleError}</StatusAlert> : null}
+                  <div className="flex flex-wrap gap-2">
+                    {movieNight.status === "confirmed" ? <Button type="button" onClick={handleCompleteMovieNight} disabled={lifecycleBusy} variant="outline" className="min-h-11 border-white/20 text-slate-100">
+                      {completeState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}End event
+                    </Button> : null}
+                    <Button type="button" variant="outline" onClick={handleCancelMovieNight} disabled={lifecycleBusy} className="min-h-11 border-rose-400/40 text-rose-200 hover:bg-rose-500/10">
+                      {cancelState === "saving" ? <Loader2 className="size-4 animate-spin" /> : null}Cancel movie night
+                    </Button>
+                  </div>
+                </section>
+              </details>
+            ) : null}
           </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm tabular-nums text-slate-300">
+            <span className={`rounded border border-white/15 px-2 py-1 font-medium ${statusTone(movieNight?.status) === "green" ? "text-green-200" : movieNight?.status === "cancelled" ? "text-rose-200" : "text-cyan-200"}`}>{movieNight?.status === "voting" && isVotingClosed(movieNight) ? "Voting closed" : statusLabel}</span>
+            <span>{formatDate(movieNight?.targetDate || targetDate)}</span>
+            <span>{candidateCounts.approved} approved showtime{candidateCounts.approved === 1 ? "" : "s"}</span>
+            {movieNight?.updatedAt ? <span className="text-xs text-slate-400">Updated {formatDate(movieNight.updatedAt)}</span> : null}
+          </div>
+          <p className="mt-3 max-w-prose text-sm leading-relaxed text-slate-300">{nextAction}</p>
+        </header>
 
-        </section>
+        <AdminSectionNav active={activeSection} onChange={setActiveSection} summaries={{
+          setup: movieNight ? (canEditSetup ? "Ready to edit" : "Locked") : "Choose a movie",
+          showtimes: `${candidateCounts.approved} approved`,
+          voting: movieNight?.status === "voting" ? (isVotingClosed(movieNight) ? "Ready to confirm" : `${results?.voteCount || 0} ballots`) : statusLabel,
+          people: `${members.length} member${members.length === 1 ? "" : "s"} · ${invites.length} invite${invites.length === 1 ? "" : "s"}`,
+        }} />
 
-        {movieNight && ["planning", "voting", "confirmed"].includes(movieNight.status) ? (
-          <section aria-labelledby="event-actions-title" className="mb-6 rounded-xl border border-white/10 bg-slate-900/80 p-4 sm:p-5">
-            <h2 id="event-actions-title" className="font-semibold text-white">{movieNight.status === "confirmed" ? "End event" : "Cancel movie night"}</h2>
-            <p className="mt-2 text-sm text-slate-300">{movieNight.status === "confirmed" ? "Ending this night moves it to club history and closes voting and RSVP. You can end it at any time." : "Cancel this night to close planning and voting. Club members will be notified."}</p>
-            {lifecycleError ? <StatusAlert tone="danger" className="mt-4">{lifecycleError}</StatusAlert> : null}
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              {movieNight.status === "confirmed" ? <Button type="button" onClick={handleCompleteMovieNight} disabled={lifecycleBusy} className="min-h-11 bg-violet-400 text-slate-950 hover:bg-violet-300">
-                {completeState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}End event
-              </Button> : null}
-              <Button type="button" variant="outline" onClick={handleCancelMovieNight} disabled={lifecycleBusy} className="min-h-11 border-rose-400/40 text-rose-200 hover:bg-rose-500/10">
-                {cancelState === "saving" ? <Loader2 className="size-4 animate-spin" /> : null}Cancel movie night
-              </Button>
-            </div>
-          </section>
-        ) : lifecycleError ? <StatusAlert tone="danger" className="mb-4">{lifecycleError}</StatusAlert> : null}
-        {movieNight?.status === "confirmed" ? <label className="mb-5 block text-sm text-slate-300">Reason for changing the plan (optional)<Input className="mt-2" maxLength={1000} value={changeReason} onChange={event => setChangeReason(event.target.value)} /></label> : null}
-
-        <ProgressStrip completedCount={completedProgress} />
-        <AdminSectionNav active={activeSection} onChange={setActiveSection} />
-
+        {lifecycleError && !movieNight ? <StatusAlert tone="danger" className="mb-4">{lifecycleError}</StatusAlert> : null}
         {error ? <StatusAlert tone="danger" className="mb-4">{error}</StatusAlert> : null}
         {message ? <StatusAlert tone="success" className="mb-4">{message}</StatusAlert> : null}
 
+        <section id="admin-panel-setup" role="tabpanel" aria-labelledby="admin-tab-setup" tabIndex={0} hidden={activeSection !== "setup"} className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-violet-300">
         <div className={activeSection === "setup" ? "mb-6 grid gap-6 lg:grid-cols-12 lg:items-start" : "hidden"}>
         <AdminStepCard
-          step="Step 1"
-          title="Movie"
+              title="Movie"
           description="Choose the title members will vote showtimes for. Discovery supports theatrical releases and upcoming movies."
           status={movieNight || selectedMovie ? "complete" : "current"}
           className="lg:col-span-8"
@@ -1064,7 +1115,7 @@ export default function ClubAdminPage() {
                 Coming Soon
               </FilterChip>
             </div>
-            <span className="text-sm text-slate-500">{nowPlayingMovies.length} discovered</span>
+            <span className="text-sm text-slate-400">{nowPlayingMovies.length} discovered</span>
           </div>
             {isNowPlayingLoading ? (
               <div className="flex items-center gap-2 text-sm text-slate-400">
@@ -1074,16 +1125,18 @@ export default function ClubAdminPage() {
             ) : (
               <MovieGrid movies={nowPlayingMovies} selectedMovie={selectedMovie} onSelect={canEditSetup ? handleSelectMovie : undefined} emptyText="No movies loaded yet. Use search or try again shortly." compact />
             )}
+            {actionFeedback("discovery")}
             <div className="mt-6 border-t border-white/10 pt-5">
               <h3 className="font-semibold text-white">Search the movie catalog</h3>
               <p className="mt-1 text-sm text-slate-400">Use search when a title is missing from the current theatrical lists.</p>
-              <form onSubmit={handleSearch} className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-                <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by movie title" className="border-white/10 bg-white/5 text-white" />
+              <form onSubmit={handleSearch} className="mt-4 grid items-end gap-3 sm:grid-cols-[1fr_auto]">
+                <Field label="Movie title"><Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by movie title" className="border-white/10 bg-white/5 text-white" /></Field>
                 <Button type="submit" disabled={movieSearchState === "saving" || searchQuery.trim().length < 2} className="bg-violet-400 text-slate-950 hover:bg-violet-300">
                   {movieSearchState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
                   Search movies
                 </Button>
               </form>
+              {actionFeedback("search")}
               {movies.length ? (
                 <div className="mt-5">
                   <MovieGrid movies={movies} selectedMovie={selectedMovie} onSelect={canEditSetup ? handleSelectMovie : undefined} emptyText="Search results will appear here." compact />
@@ -1104,7 +1157,7 @@ export default function ClubAdminPage() {
                   {selectedPoster ? (
                     <Image src={selectedPoster} alt={selectedMovie.title} fill sizes="80px" className="object-cover" />
                   ) : (
-                    <div className="grid h-full place-items-center text-slate-500">
+                    <div className="grid h-full place-items-center text-slate-400">
                       <Film className="size-8" />
                     </div>
                   )}
@@ -1123,6 +1176,7 @@ export default function ClubAdminPage() {
             <Field label="Target date">
               <Input
                 type="date"
+                disabled={!canEditSetup}
                 value={planningForm.targetDate}
                 onChange={(event) => {
                   setTargetDate(event.target.value);
@@ -1140,30 +1194,34 @@ export default function ClubAdminPage() {
               {createState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
               {createButtonLabel}
             </Button>
+            {actionFeedback("setup")}
           </CardContent>
         </Card>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <section className={activeSection === "setup" || activeSection === "showtimes" ? "space-y-6 lg:col-span-12" : "hidden"}>
-            {activeSection === "setup" ? (
             <PlanningPanel
+              feedback={actionFeedback("planning")}
               form={planningForm}
               hasMovieNight={Boolean(movieNight)}
               isSaving={planningState === "saving"}
               canEdit={Boolean(movieNight?.status === "planning")}
-              onChange={setPlanningForm}
+              onChange={form => { setPlanningForm(form); setTargetDate(form.targetDate); }}
               onSave={handleSavePlanning}
               today={today}
               validationError={planningValidationError}
               usesAccountDefaults={usesAccountDefaults && !movieNight}
             />
-            ) : null}
+        </section>
 
+        <section id="admin-panel-showtimes" role="tabpanel" aria-labelledby="admin-tab-showtimes" tabIndex={0} hidden={activeSection !== "showtimes"} className="space-y-6 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-violet-300">
             {activeSection === "showtimes" ? (<>
             <CandidateShowtimesPanel
+              importFeedback={actionFeedback("import")}
+              reviewFeedback={actionFeedback("candidates")}
+              reviewFeedbackId={candidateFeedbackId}
               counts={candidateCounts}
               filters={{
+                status: candidateStatusFilter,
                 date: candidateDateFilter,
                 theater: candidateTheaterFilter,
                 format: candidateFormatFilter,
@@ -1174,6 +1232,7 @@ export default function ClubAdminPage() {
               movieNight={movieNight}
               onBulkApprove={handleBulkApproveCandidates}
               onFilterChange={(nextFilters) => {
+                setCandidateStatusFilter(nextFilters.status);
                 setCandidateDateFilter(nextFilters.date);
                 setCandidateTheaterFilter(nextFilters.theater);
                 setCandidateFormatFilter(nextFilters.format);
@@ -1187,6 +1246,8 @@ export default function ClubAdminPage() {
                     : [...current, showtimeId]
                 )
               }
+              onSelectVisible={() => setSelectedCandidateIds(current => Array.from(new Set([...current, ...visibleCandidates.map(showtime => showtime.showtimeId)])))}
+              onClearSelected={() => setSelectedCandidateIds([])}
               selectedIds={selectedCandidateIds}
               showtimes={currentShowtimes}
               visibleShowtimes={visibleCandidates}
@@ -1194,6 +1255,7 @@ export default function ClubAdminPage() {
 
             {showImportRecovery ? (
               <GracenoteImportPanel
+                feedback={actionFeedback("recovery")}
                 cachedShowtimes={cachedShowtimes}
                 gracenoteState={gracenoteState}
                 importState={importState}
@@ -1214,15 +1276,15 @@ export default function ClubAdminPage() {
               />
             ) : null}
 
-            <AdminShowtimes showtimes={approvedCandidates} />
             </>) : null}
           </section>
 
-          <aside className={activeSection === "voting" || activeSection === "people" ? "grid gap-6 lg:col-span-12 lg:grid-cols-2 lg:items-start" : "hidden"}>
+        <section id="admin-panel-people" role="tabpanel" aria-labelledby="admin-tab-people" tabIndex={0} hidden={activeSection !== "people"} className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-violet-300">
+          <div className="grid min-w-0 gap-6 lg:grid-cols-2 lg:items-start">
             <Card className={`${activeSection === "people" ? "" : "hidden"} border-white/10 bg-slate-900/80 py-6`}>
               <CardHeader>
                 <h2 className="font-semibold text-white">Club invites</h2>
-                <p className="text-sm text-slate-400">Send a reusable link from Messages, or create an email-specific invite below.</p>
+                <p className="text-sm text-slate-400">Share a reusable invite link in any app, or create an email-specific invite below.</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Button
@@ -1232,16 +1294,16 @@ export default function ClubAdminPage() {
                   className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300"
                 >
                   {shareInviteState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Share2 className="size-4" />}
-                  Invite via Messages
+                  Share invite link
                 </Button>
-                <div className="flex items-center gap-3 text-xs text-slate-500 before:h-px before:flex-1 before:bg-white/10 after:h-px after:flex-1 after:bg-white/10">or invite by email</div>
+                <div className="flex items-center gap-3 text-xs text-slate-400 before:h-px before:flex-1 before:bg-white/10 after:h-px after:flex-1 after:bg-white/10">or invite by email</div>
                 <form onSubmit={handleCreateInvites} className="space-y-3">
                   <Field label="Email addresses">
                     <textarea
                       value={inviteEmails}
                       onChange={(event) => setInviteEmails(event.target.value)}
                       placeholder="name@example.com, friend@example.com"
-                      className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-base text-white outline-none transition placeholder:text-slate-500 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
+                      className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-base text-white outline-none transition placeholder:text-slate-400 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
                     />
                   </Field>
                   <Button type="submit" disabled={inviteState === "saving" || !inviteEmails.trim()} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300">
@@ -1261,6 +1323,8 @@ export default function ClubAdminPage() {
                     Clear all pending invites
                   </Button>
                 ) : null}
+                {actionFeedback("invites")}
+                {copyFallback?.inviteUrl ? <Field label="Invite link to copy"><Input readOnly value={copyFallback.inviteUrl} onFocus={event => event.target.select()} /></Field> : null}
                 <InviteList
                   invites={invites}
                   copiedInviteId={copiedInviteId}
@@ -1273,84 +1337,70 @@ export default function ClubAdminPage() {
               </CardContent>
             </Card>
 
-            {activeSection === "people" ? (
-              <div className="mc-panel p-5 lg:col-span-2">
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button type="button" variant="outline" onClick={handleTestNotification} disabled={testNotificationState === "saving"} className="border-cyan-400/40 text-cyan-200 hover:bg-cyan-400/10">
-              {testNotificationState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}Send test notification
-            </Button>
-            <p className="text-xs text-slate-400">Sends a real test only to your admin account through the activity inbox, email, and enabled browser push.</p>
-          </div>
-              </div>
-            ) : null}
-
             <Card className={`${activeSection === "people" ? "" : "hidden"} border-white/10 bg-slate-900/80 py-6`}>
               <CardHeader>
                 <h2 className="font-semibold text-white">Club members</h2>
                 <p className="text-sm text-slate-400">See who receives email deadline reminders and browser push alerts.</p>
               </CardHeader>
-              <CardContent><MemberList members={members} /></CardContent>
+              <CardContent>{actionFeedback("members")}<MemberList members={members} /></CardContent>
             </Card>
 
-            {movieNight?.status === "confirmed" && movieNight.confirmedShowtime ? (
-              <div className={activeSection === "voting" ? "" : "hidden"}><ConfirmedPlanCard showtime={movieNight.confirmedShowtime} /></div>
-            ) : null}
-            <div className={activeSection === "voting" ? "" : "hidden"}>
-              <VotingControlCard
-                movieNight={movieNight}
-                showtimeCount={approvedCandidates.length}
-                voteCount={results?.voteCount || 0}
-                isSaving={votingState === "saving"}
-                votingClosesAt={votingClosesAt}
-                onVotingClosesAtChange={setVotingClosesAt}
-                onCloseVoting={handleCloseVoting}
-                onOpenVoting={handleOpenVoting}
-              />
-            </div>
-            <div className={activeSection === "voting" ? "" : "hidden"}>
+            <div className="mc-panel p-5 lg:col-span-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" onClick={handleTestNotification} disabled={testNotificationState === "saving"} className="border-cyan-400/40 text-cyan-200 hover:bg-cyan-400/10">
+              {testNotificationState === "saving" ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}Send test notification
+            </Button>
+            <p className="text-xs text-slate-400">Sends a real test only to your admin account through the activity inbox, email, and enabled browser push.</p>
+          </div>
+          {actionFeedback("notification")}
+              </div>
+
+          </div>
+        </section>
+
+        <section id="admin-panel-voting" role="tabpanel" aria-labelledby="admin-tab-voting" tabIndex={0} hidden={activeSection !== "voting"} className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-violet-300">
+          <div className="grid min-w-0 gap-6 lg:grid-cols-2 lg:items-start">
+            {movieNight?.confirmedShowtime ? <ConfirmedPlanCard showtime={movieNight.confirmedShowtime} /> : null}
+            {movieNight?.status === "confirmed" || movieNight?.status === "completed" ? <div>{actionFeedback("attendance")}<AttendanceSummaryCard status={movieNight.status} attendance={attendance} error={Boolean(feedback.attendance?.error)} /></div> : null}
+            <VotingControlCard
+              movieNight={movieNight}
+              showtimeCount={approvedCandidates.length}
+              voteCount={results?.voteCount || 0}
+              isSaving={votingState === "saving"}
+              votingClosesAt={votingClosesAt}
+              onVotingClosesAtChange={setVotingClosesAt}
+              onCloseVoting={handleCloseVoting}
+              onOpenVoting={handleOpenVoting}
+              onShowtimes={() => { setActiveSection("showtimes"); document.getElementById("admin-tab-showtimes")?.focus(); }}
+              feedback={actionFeedback("voting")}
+            />
+            <div className="min-w-0 space-y-4">
+              {movieNight?.status === "confirmed" ? (
+                <div className="space-y-3">
+                  <Button type="button" variant="outline" aria-expanded={isChangingPlan} aria-controls="change-plan" disabled={confirmState === "saving"} onClick={() => { setIsChangingPlan(current => !current); setChangeReason(""); }}>
+                    {isChangingPlan ? "Keep current plan" : "Change confirmed plan"}
+                  </Button>
+                  {isChangingPlan ? <div id="change-plan" className="space-y-3">
+                    <StatusAlert tone="warning">Changing the plan notifies members and asks them to review their RSVP and tickets.</StatusAlert>
+                    <Field label="Reason for changing the plan (optional)"><Input autoFocus maxLength={1000} value={changeReason} onChange={event => setChangeReason(event.target.value)} /></Field>
+                  </div> : null}
+                </div>
+              ) : null}
               <AdminResults
                 results={results}
+                alternatives={approvedCandidates}
+                feedbackShowtimeId={confirmingShowtimeId}
                 onConfirm={handleConfirm}
                 isSaving={confirmState === "saving"}
-                canConfirm={Boolean(movieNight && (movieNight.status === "confirmed" || (movieNight.status === "voting" && isVotingClosed(movieNight))))}
-                isChangingConfirmedShowtime={movieNight?.status === "confirmed"}
+                canConfirm={Boolean(movieNight && ((movieNight.status === "confirmed" && isChangingPlan) || (movieNight.status === "voting" && isVotingClosed(movieNight))))}
+                isChangingConfirmedShowtime={movieNight?.status === "confirmed" && isChangingPlan}
+                feedback={actionFeedback("results")}
               />
             </div>
-            <div className={activeSection === "voting" ? "" : "hidden"}><AttendanceSummaryCard status={movieNight?.status} attendance={attendance} /></div>
-          </aside>
-        </div>
+          </div>
+        </section>
       </div>
     </AppShell>
-  );
-}
-
-function ProgressStrip({ completedCount }: { completedCount: number }) {
-  return (
-    <section aria-label="Movie night progress" className="mb-5 flex gap-1.5 overflow-x-auto pb-1">
-      {progressSteps.map((step, index) => (
-        <div key={step.label} className="min-w-28 flex-1">
-          <div className={`h-1 rounded-full ${index < completedCount ? "bg-violet-400" : index === completedCount ? "bg-violet-300/50" : "bg-white/10"}`} />
-          <p className={`mt-2 text-xs font-medium ${index === completedCount ? "text-white" : "text-slate-500"}`}>{step.label}</p>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function Metric({ label, value, tone = "default" }: { label: string; value: string; tone?: MetricTone }) {
-  const toneClasses: Record<MetricTone, string> = {
-    default: "text-white",
-    green: "text-green-200",
-    amber: "text-amber-200",
-    cyan: "text-cyan-200",
-    rose: "text-rose-200",
-  };
-
-  return (
-    <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`mt-1 break-words text-sm font-semibold ${toneClasses[tone]}`}>{value}</p>
-    </div>
   );
 }
 
@@ -1382,13 +1432,14 @@ function MovieGrid({
             type="button"
             onClick={() => onSelect?.(movie)}
             disabled={!onSelect}
-            className={`overflow-hidden rounded-lg border bg-white/5 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${activeMovie ? "border-cyan-300/60 bg-cyan-400/10" : "border-white/10 hover:border-white/25 hover:bg-white/10"}`}
+            aria-pressed={activeMovie}
+            className={`overflow-hidden rounded-lg border bg-white/5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 ${activeMovie ? "border-cyan-300/60 bg-cyan-400/10" : "border-white/10 hover:border-white/25 hover:bg-white/10"}`}
           >
             <div className={`relative bg-slate-950 ${compact ? "h-32" : "h-64"}`}>
               {image ? (
                 <Image src={image} alt={movie.title} fill sizes={compact ? "180px" : "240px"} className="object-cover" />
               ) : (
-                <div className="grid h-full place-items-center text-slate-500">
+                <div className="grid h-full place-items-center text-slate-400">
                   <Film className="size-10" />
                 </div>
               )}
@@ -1405,6 +1456,7 @@ function MovieGrid({
 }
 
 function PlanningPanel({
+  feedback,
   canEdit,
   form,
   hasMovieNight,
@@ -1415,6 +1467,7 @@ function PlanningPanel({
   usesAccountDefaults,
   validationError,
 }: {
+  feedback?: React.ReactNode;
   canEdit: boolean;
   form: MovieNightPlanningInput;
   hasMovieNight: boolean;
@@ -1427,12 +1480,13 @@ function PlanningPanel({
 }) {
   return (
     <AdminStepCard
-      step="Step 2"
       title="Planning"
-      description="Save the reusable criteria the backend uses for multi-day showtime imports."
+      description="Choose nearby theaters, formats, and the dates to search for showtimes."
       status={canEdit ? "current" : hasMovieNight ? "complete" : "blocked"}
     >
       <div className="space-y-4">
+        {hasMovieNight && !canEdit ? <StatusAlert tone="info">Planning is read-only because voting has started or this night has ended.</StatusAlert> : null}
+        <fieldset disabled={!canEdit && hasMovieNight} className="space-y-4">
         <div className="grid gap-3 md:grid-cols-3">
           <Field label="Target date">
             <Input type="date" min={today} value={form.targetDate} onChange={(event) => onChange({ ...form, targetDate: event.target.value })} className="border-white/10 bg-white/5 text-white" />
@@ -1456,7 +1510,7 @@ function PlanningPanel({
           onPreferredFormatsChange={(preferredFormats) => onChange({ ...form, preferredFormats })}
           disabled={!canEdit && hasMovieNight}
         />
-        {validationError ? <StatusAlert tone="warning">{validationError}</StatusAlert> : null}
+        {canEdit && validationError ? <StatusAlert tone="warning">{validationError}</StatusAlert> : null}
         <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
           <Field label="Timezone">
             <Input value={form.timezone || "America/Chicago"} onChange={(event) => onChange({ ...form, timezone: event.target.value })} className="border-white/10 bg-white/5 text-white" />
@@ -1466,10 +1520,10 @@ function PlanningPanel({
             Save planning
           </Button>
         </div>
+        </fieldset>
+        {feedback}
         {!hasMovieNight ? (
           <StatusAlert tone="warning">Create the movie night first, then save planning updates and import showtimes.</StatusAlert>
-        ) : !canEdit ? (
-          <StatusAlert tone="warning">Planning criteria are locked after voting opens.</StatusAlert>
         ) : null}
       </div>
     </AdminStepCard>
@@ -1477,6 +1531,11 @@ function PlanningPanel({
 }
 
 function CandidateShowtimesPanel({
+  importFeedback,
+  reviewFeedback,
+  reviewFeedbackId,
+  onSelectVisible,
+  onClearSelected,
   counts,
   filters,
   hasUnsavedPlanning,
@@ -1492,14 +1551,19 @@ function CandidateShowtimesPanel({
   showtimes,
   visibleShowtimes,
 }: {
+  importFeedback?: React.ReactNode;
+  reviewFeedback?: React.ReactNode;
+  reviewFeedbackId: string | null;
+  onSelectVisible: () => void;
+  onClearSelected: () => void;
   counts: { imported: number; approved: number; rejected: number; duplicates: number };
-  filters: { date: string; theater: string; format: string };
+  filters: { date: string; theater: string; format: string; status: string };
   hasUnsavedPlanning: boolean;
   importState: ActionState;
   isCandidateSaving: boolean;
   movieNight?: ActiveMovieNightResponse["movieNight"];
   onBulkApprove: () => void;
-  onFilterChange: (filters: { date: string; theater: string; format: string }) => void;
+  onFilterChange: (filters: { date: string; theater: string; format: string; status: string }) => void;
   onImport: () => void;
   onStatusChange: (showtimeId: string, status: "approved" | "rejected") => void;
   onToggleSelected: (showtimeId: string) => void;
@@ -1513,16 +1577,18 @@ function CandidateShowtimesPanel({
   const groupedShowtimes = groupShowtimesByTheater(visibleShowtimes, showtimeDateTime);
   const summary = movieNight?.lastShowtimeImportSummary;
   const importInProgress = ["queued", "running"].includes(movieNight?.showtimeImportStatus || "");
+  const readOnly = Boolean(movieNight && ["completed", "cancelled"].includes(movieNight.status));
   const completedEmpty = movieNight?.showtimeImportStatus === "completed" && !showtimes.length;
 
   return (
     <AdminStepCard
-      step="Step 3"
       title="Showtimes"
       description="Import candidates from the saved planning window, then approve only the options members should rank."
       status={counts.approved ? "complete" : movieNight ? "current" : "blocked"}
     >
       <div className="space-y-5">
+        {reviewFeedbackId && !visibleShowtimes.some(showtime => showtime.showtimeId === reviewFeedbackId) ? reviewFeedback : null}
+        {readOnly ? <StatusAlert tone="info">This night has ended. Showtimes are available for review only.</StatusAlert> : null}
         <div className="grid grid-cols-2 gap-2 text-center text-xs md:grid-cols-4">
           <MiniStat value={`${counts.imported}`} label="imported" />
           <MiniStat value={`${counts.approved}`} label="approved" tone="green" />
@@ -1533,28 +1599,29 @@ function CandidateShowtimesPanel({
         <div className="rounded-lg border border-white/10 bg-white/5 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-semibold text-white">Backend import</p>
+              <p className="font-semibold text-white">Find showtimes</p>
               <p className="mt-1 text-sm text-slate-400">
                 Uses {movieNight?.dateWindowStart || "start TBD"} through {movieNight?.dateWindowEnd || "end TBD"} near {movieNight?.zipCode || "ZIP TBD"}.
               </p>
             </div>
-            <Button onClick={onImport} disabled={!movieNight || importState === "saving" || importInProgress || hasUnsavedPlanning} className="bg-violet-400 text-slate-950 hover:bg-violet-300">
+            <Button onClick={onImport} disabled={readOnly || !movieNight || importState === "saving" || importInProgress || hasUnsavedPlanning} className="bg-violet-400 text-slate-950 hover:bg-violet-300">
               {importState === "saving" || importInProgress ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
               {importInProgress ? "Import in progress" : "Import showtimes"}
             </Button>
           </div>
+          {importFeedback}
           {summary?.requestedDates?.length ? (
             <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
               <MiniStat value={`${summary.requestedDates.length}`} label="days checked" />
-              <MiniStat value={`${summary.resultCount || 0}`} label="provider results" tone="cyan" />
+              <MiniStat value={`${summary.resultCount || 0}`} label="matches found" tone="cyan" />
               <MiniStat value={`${summary.importedCount || 0}`} label="new candidates" tone="green" />
               <MiniStat value={`${summary.duplicateCount || 0}`} label="duplicates" />
             </div>
           ) : null}
           {hasUnsavedPlanning ? <StatusAlert tone="warning" className="mt-3">Save your planning changes before searching for showtimes.</StatusAlert> : null}
-          {completedEmpty ? <StatusAlert tone="warning" className="mt-3">The provider search completed but returned no candidates. Use the guided recovery section below to refresh and search the provider cache.</StatusAlert> : null}
+          {completedEmpty ? <StatusAlert tone="warning" className="mt-3">No showtimes were found. Try refreshing theater listings in the section below.</StatusAlert> : null}
           {movieNight?.showtimeImportStatus === "failed" ? (
-            <StatusAlert tone="danger" className="mt-3">{summary?.errorMessage || "The provider import failed. Try again shortly."}</StatusAlert>
+            <StatusAlert tone="danger" className="mt-3">{summary?.errorMessage || "Showtime search failed. Try again shortly."}</StatusAlert>
           ) : null}
         </div>
 
@@ -1571,7 +1638,8 @@ function CandidateShowtimesPanel({
 
         {showtimes.length ? (
           <>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="Status"><NativeSelect value={filters.status} onChange={value => onFilterChange({ ...filters, status: value })} options={["all", "imported", "approved", "rejected"]} /></Field>
               <Field label="Date">
                 <NativeSelect value={filters.date} onChange={(value) => onFilterChange({ ...filters, date: value })} options={["all", ...dates]} />
               </Field>
@@ -1583,14 +1651,11 @@ function CandidateShowtimesPanel({
               </Field>
             </div>
 
-            <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-sm text-slate-300">{visibleShowtimes.length} visible / {selectedIds.length} selected</span>
-              <Button type="button" size="sm" onClick={onBulkApprove} disabled={!selectedIds.length || isCandidateSaving} className="bg-violet-400 text-slate-950 hover:bg-violet-300">
-                {isCandidateSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                Approve selected
-              </Button>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-y border-white/10 py-3">
+              <span className="text-sm text-slate-300">{visibleShowtimes.length} visible · {selectedIds.length} selected</span>
+              <Button type="button" size="sm" variant="outline" onClick={onSelectVisible} disabled={readOnly || isCandidateSaving || !visibleShowtimes.length || visibleShowtimes.every(showtime => selectedIds.includes(showtime.showtimeId))}>Select all visible</Button>
             </div>
-
+            {!visibleShowtimes.length ? <p className="text-sm text-slate-300">No showtimes match these filters. Choose All to see more options.</p> : null}
             <div className="space-y-4">
               {groupedShowtimes.map((group) => (
                 <TheaterShowtimeSection key={group.key} group={group}>
@@ -1599,7 +1664,7 @@ function CandidateShowtimesPanel({
                       const selected = selectedIds.includes(showtime.showtimeId);
                       return (
                         <div key={showtime.showtimeId} className="rounded-lg border border-white/10 bg-white/5 p-3">
-                          <button type="button" onClick={() => onToggleSelected(showtime.showtimeId)} className="w-full text-left">
+                          <button type="button" aria-pressed={selected} aria-label={`Select ${showtimeLabel(showtime)}`} disabled={readOnly || isCandidateSaving} onClick={() => onToggleSelected(showtime.showtimeId)} className="w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
                             <ShowtimeCardBody selected={selected} dateTime={showtimeDateTime(showtime)} screenFormat={showtime.screenFormat} ticketURI={showtime.ticketURI} />
                           </button>
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -1607,14 +1672,15 @@ function CandidateShowtimesPanel({
                               {showtime.status || "approved"}
                             </span>
                             <div className="flex gap-2">
-                              <Button type="button" size="sm" variant="outline" onClick={() => onStatusChange(showtime.showtimeId, "approved")} disabled={isCandidateSaving || showtime.status === "approved"} className="border-white/10 text-slate-100 hover:bg-white/10">
+                              <Button type="button" size="sm" aria-label={`Approve ${showtimeLabel(showtime)}`} variant="outline" onClick={() => onStatusChange(showtime.showtimeId, "approved")} disabled={readOnly || isCandidateSaving || !showtime.status || showtime.status === "approved"} className="border-white/10 text-slate-100 hover:bg-white/10">
                                 Approve
                               </Button>
-                              <Button type="button" size="sm" variant="ghost" onClick={() => onStatusChange(showtime.showtimeId, "rejected")} disabled={isCandidateSaving || showtime.status === "rejected"} className="text-rose-100 hover:bg-rose-400/10">
+                              <Button type="button" size="sm" aria-label={`Reject ${showtimeLabel(showtime)}`} variant="ghost" onClick={() => onStatusChange(showtime.showtimeId, "rejected")} disabled={readOnly || isCandidateSaving || showtime.status === "rejected"} className="text-rose-100 hover:bg-rose-400/10">
                                 Reject
                               </Button>
                             </div>
                           </div>
+                          {reviewFeedbackId === showtime.showtimeId ? reviewFeedback : null}
                         </div>
                       );
                     })}
@@ -1622,11 +1688,24 @@ function CandidateShowtimesPanel({
                 </TheaterShowtimeSection>
               ))}
             </div>
+            {selectedIds.length ? (
+              <div role="region" aria-label="Showtime review actions" className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 space-y-3 rounded-lg border border-white/20 bg-slate-900 p-3 lg:bottom-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-white">{selectedIds.length} selected</span>
+                  <Button type="button" size="sm" variant="outline" onClick={onClearSelected} disabled={readOnly || isCandidateSaving}>Clear selected</Button>
+                  <Button type="button" size="sm" onClick={onBulkApprove} disabled={readOnly || isCandidateSaving} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300 sm:w-auto">
+                    {isCandidateSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Approve selected
+                  </Button>
+                </div>
+                {!reviewFeedbackId ? reviewFeedback : null}
+              </div>
+            ) : !reviewFeedbackId ? reviewFeedback : null}
+
           </>
         ) : (
           <EmptyState
-            title="No imported candidates"
-            description="Save planning criteria, then import showtimes. The backend will fetch each date in the saved window."
+      title="No imported candidates"
+            description="Save your planning preferences, then find showtimes across your selected dates."
             className="bg-white/5"
           />
         )}
@@ -1636,6 +1715,7 @@ function CandidateShowtimesPanel({
 }
 
 function NativeSelect({
+  id,
   value,
   onChange,
   options,
@@ -1643,9 +1723,11 @@ function NativeSelect({
   value: string;
   onChange: (value: string) => void;
   options: string[];
+  id?: string;
 }) {
   return (
     <select
+      id={id}
       value={value}
       onChange={(event) => onChange(event.target.value)}
       className="h-11 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-base text-white outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:h-9 md:text-sm"
@@ -1660,6 +1742,7 @@ function NativeSelect({
 }
 
 function GracenoteImportPanel({
+  feedback,
   cachedShowtimes,
   gracenoteState,
   importState,
@@ -1678,6 +1761,7 @@ function GracenoteImportPanel({
   timeBucket,
   visibleShowtimes,
 }: {
+  feedback?: React.ReactNode;
   cachedShowtimes: CachedShowtime[];
   gracenoteState: LoadState;
   importState: ActionState;
@@ -1710,12 +1794,12 @@ function GracenoteImportPanel({
       <div className="space-y-5">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-amber-200">Showtime recovery</p>
-          <h3 className="mt-1 text-xl font-semibold text-white">Refresh and search provider cache</h3>
-          <p className="mt-1 text-sm text-slate-400">The automatic search found no candidates. Refresh provider data, review matches, and import only the useful showtimes.</p>
+          <h3 className="mt-1 text-xl font-semibold text-white">Refresh theater listings</h3>
+          <p className="mt-1 text-sm text-slate-400">The automatic search could not find showtimes. Refresh theater listings, review matches, and add the options you want.</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="grid grid-cols-2 gap-2 text-center text-xs sm:min-w-48">
-            <MiniStat value={`${cachedShowtimes.length}`} label="cached" />
+            <MiniStat value={`${cachedShowtimes.length}`} label="available" />
             <MiniStat value={`${selectedCount}`} label="selected" tone="cyan" />
           </div>
         </div>
@@ -1727,8 +1811,8 @@ function GracenoteImportPanel({
 
           <div className="grid gap-3 md:grid-cols-2">
             <ActionPanel
-              title="1. Queue fresh showtimes"
-              description="Ask Gracenote to refresh the cache for this area. This can run before you search."
+        title="1. Queue fresh showtimes"
+              description="Request the latest listings for this area before searching again."
               icon={<RefreshCcw className="size-4" />}
               disabled={refreshState === "saving" || gracenoteState === "loading"}
               isLoading={refreshState === "saving"}
@@ -1737,8 +1821,8 @@ function GracenoteImportPanel({
               tone="cyan"
             />
             <ActionPanel
-              title="2. Search cached matches"
-              description="Find cached showtimes for the selected movie and current search window."
+        title="2. Search available listings"
+              description="Find available showtimes for this movie across your selected dates."
               icon={<Search className="size-4" />}
               disabled={gracenoteState === "loading"}
               isLoading={gracenoteState === "loading"}
@@ -1749,11 +1833,12 @@ function GracenoteImportPanel({
           </div>
         </form>
 
+        {feedback}
         {cachedShowtimes.length ? (
           <div className="space-y-3">
             <div className="space-y-3 rounded-lg border border-white/10 bg-slate-950/30 p-3">
               <div className="space-y-2">
-                <p className="text-xs font-medium uppercase text-slate-500">Date</p>
+                <p className="text-xs font-medium uppercase text-slate-400">Date</p>
                 <div className="flex flex-wrap gap-2">
                   <FilterChip isActive={selectedDate === "all"} onClick={() => onSelectedDateChange("all")}>
                     All dates
@@ -1766,7 +1851,7 @@ function GracenoteImportPanel({
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-xs font-medium uppercase text-slate-500">Time</p>
+                <p className="text-xs font-medium uppercase text-slate-400">Time</p>
                 <div className="flex flex-wrap gap-2">
                   {showtimeTimeBuckets.map((bucket) => (
                     <FilterChip key={bucket.value} isActive={timeBucket === bucket.value} onClick={() => onTimeBucketChange(bucket.value)}>
@@ -1780,8 +1865,8 @@ function GracenoteImportPanel({
             <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm text-slate-300">
                 {hasActiveFilters
-                  ? `${visibleShowtimes.length} of ${cachedShowtimes.length} cached showtime${cachedShowtimes.length === 1 ? "" : "s"} visible`
-                  : `${cachedShowtimes.length} cached showtime${cachedShowtimes.length === 1 ? "" : "s"}`}{" "}
+                  ? `${visibleShowtimes.length} of ${cachedShowtimes.length} available showtime${cachedShowtimes.length === 1 ? "" : "s"} visible`
+                  : `${cachedShowtimes.length} available showtime${cachedShowtimes.length === 1 ? "" : "s"}`}{" "}
                 across {groupedShowtimes.length} theater{groupedShowtimes.length === 1 ? "" : "s"}
                 {hiddenSelectedCount > 0 ? ` / ${hiddenSelectedCount} selected hidden by filters` : ""}
               </span>
@@ -1810,7 +1895,8 @@ function GracenoteImportPanel({
                             type="button"
                             onClick={() => onToggle(showtime)}
                             aria-pressed={isSelected}
-                            className={`w-full rounded-lg border p-3 text-left transition duration-200 active:scale-[0.99] ${isSelected ? "border-cyan-300/60 bg-cyan-400/10" : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"}`}
+                            aria-label={`Select ${showtime.theaterName}, ${formatDate(dateTime)}, ${formatTime(dateTime)}, ${showtime.screenFormat || "Standard"}`}
+                            className={`w-full rounded-lg border p-3 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 active:scale-[0.99] ${isSelected ? "border-cyan-300/60 bg-cyan-400/10" : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"}`}
                           >
                             <ShowtimeCardBody selected={isSelected} dateTime={dateTime} screenFormat={showtime.screenFormat} ticketURI={showtime.ticketURI} />
                           </button>
@@ -1822,7 +1908,7 @@ function GracenoteImportPanel({
               </div>
             ) : (
               <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-400">
-                No cached showtimes match these date and time filters. Adjust the filters above to show more options.
+                No available showtimes match these date and time filters. Adjust the filters above to show more options.
               </p>
             )}
             <Button onClick={onImport} disabled={!selectedCount || importState === "saving"} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300">
@@ -1832,8 +1918,8 @@ function GracenoteImportPanel({
           </div>
         ) : (
           <EmptyState
-            title="No cached showtimes loaded"
-            description="Queue a refresh if needed, then search the cache for this movie."
+      title="No theater listings loaded"
+            description="Refresh listings if needed, then search again for this movie."
             className="bg-white/5"
           />
         )}
@@ -1882,7 +1968,7 @@ function MiniStat({ value, label, tone = "default" }: { value: string; label: st
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-2">
       <p className={`font-semibold ${toneClass}`}>{value}</p>
-      <p className="mt-0.5 text-slate-500">{label}</p>
+      <p className="mt-0.5 text-slate-400">{label}</p>
     </div>
   );
 }
@@ -1900,7 +1986,8 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-11 rounded border px-3 py-1.5 text-sm transition md:min-h-9 ${
+      aria-pressed={isActive}
+      className={`min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 rounded border px-3 py-1.5 text-sm transition md:min-h-9 ${
         isActive
           ? "border-cyan-300/60 bg-cyan-400/15 text-cyan-50"
           : "border-white/10 bg-white/5 text-slate-300 hover:border-white/25 hover:bg-white/10"
@@ -1908,51 +1995,6 @@ function FilterChip({
     >
       {children}
     </button>
-  );
-}
-
-function AdminShowtimes({ showtimes }: { showtimes: Showtime[] }) {
-  const groupedShowtimes = groupShowtimesByTheater(showtimes, showtimeDateTime);
-
-  return (
-    <AdminStepCard
-      step="Step 3"
-      title="Voting ballot"
-      description={
-        showtimes.length
-          ? `${showtimes.length} member-votable slot${showtimes.length === 1 ? "" : "s"} across ${groupedShowtimes.length} theater${groupedShowtimes.length === 1 ? "" : "s"}.`
-          : "Imported showtimes will appear here as the ballot options members rank."
-      }
-      status={showtimes.length ? "complete" : "current"}
-    >
-      <div className="space-y-3">
-        {showtimes.length ? (
-          groupedShowtimes.map((group) => (
-            <TheaterShowtimeSection key={group.key} group={group}>
-              <div className="grid gap-3 md:grid-cols-2">
-                {group.showtimes.map((showtime) => (
-                  <ShowtimeCard
-                    key={showtime.showtimeId}
-                    theaterName={showtime.theaterName}
-                    theaterLocation={showtime.theaterLocation}
-                    dateTime={showtimeDateTime(showtime)}
-                    screenFormat={showtime.screenFormat}
-                    ticketURI={showtime.ticketURI}
-                    compact
-                  />
-                ))}
-              </div>
-            </TheaterShowtimeSection>
-          ))
-        ) : (
-          <EmptyState
-            title="No ballot options yet"
-            description="Search cached showtimes above, select the best options, then import them for the member ballot."
-            className="bg-white/5"
-          />
-        )}
-      </div>
-    </AdminStepCard>
   );
 }
 
@@ -1979,7 +2021,7 @@ function ShowtimeCardBody({
           <Clock className="size-4 text-amber-300" />
           {formatTime(dateTime)}
         </p>
-        {ticketURI ? <p className="mt-2 truncate text-xs text-slate-500">Tickets linked</p> : null}
+        {ticketURI ? <p className="mt-2 truncate text-xs text-slate-400">Tickets linked</p> : null}
       </div>
     </div>
   );
@@ -2199,93 +2241,54 @@ function cachedShowtimeDateTime(showtime: CachedShowtime) {
   return showtime.localDateTime || showtime.startsAtUtc;
 }
 
-function AdminResults({
-  results,
-  onConfirm,
-  isSaving,
-  canConfirm,
-  isChangingConfirmedShowtime,
-}: {
+function AdminResults({ results, alternatives, onConfirm, isSaving, canConfirm, isChangingConfirmedShowtime, feedback, feedbackShowtimeId }: {
   results: VoteResults | null;
+  alternatives: Showtime[];
+  feedbackShowtimeId: string | null;
   onConfirm: (showtimeId: string) => Promise<void>;
   isSaving: boolean;
   canConfirm: boolean;
   isChangingConfirmedShowtime: boolean;
+  feedback?: React.ReactNode;
 }) {
-  const winner = results?.standings?.[0];
+  const standings = results?.standings || [];
+  const unranked = isChangingConfirmedShowtime ? alternatives.filter(showtime => !standings.some(standing => standing.showtimeId === showtime.showtimeId)) : [];
   return (
     <AdminStepCard
-      step="Step 4"
-      title="Results and confirmation"
-      description={isChangingConfirmedShowtime ? "Choose an approved showtime to correct the confirmed plan." : results ? `${results.voteCount} ballots submitted` : "Results appear after voting opens and members rank showtimes."}
-      status={winner ? "current" : "waiting"}
+      title={isChangingConfirmedShowtime ? "Choose a replacement showtime" : "Voting results"}
+      description={isChangingConfirmedShowtime ? "Choose an approved showtime. You will review the details before saving." : results ? `${results.voteCount} ballots submitted. Standings show points and first-choice votes.` : "Standings appear after members rank showtimes."}
+      status={canConfirm ? "current" : "waiting"}
     >
       <div className="space-y-3">
-        {winner ? (
-          <div className="rounded-lg border border-green-400/30 bg-green-500/10 p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-green-100">
-              <ClipboardCheck className="size-4" />
-              Current leader
-            </p>
-            <p className="mt-2 font-semibold text-white">{showtimeLabel(winner.showtime)}</p>
-            <p className="mt-1 text-xs text-green-100/80">
-              {winner.points} pts / {winner.firstChoiceVotes} first-choice / {winner.rankedVotes} total rankings
-            </p>
-            {canConfirm ? (
-              <StatusAlert tone="warning" className="mt-4">
-                {isChangingConfirmedShowtime
-                  ? "Changing the plan notifies members and updates the calendar details."
-                  : "Confirming makes this the final club plan and switches members from voting to RSVP and ticket tracking."}
-              </StatusAlert>
-            ) : null}
-            {canConfirm ? (
-              <Button size="sm" onClick={() => onConfirm(winner.showtimeId)} disabled={isSaving} className="mt-4 bg-violet-400 text-slate-950 hover:bg-violet-300">
-                {isSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                {isChangingConfirmedShowtime ? "Change to leader" : "Confirm leader"}
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {results?.standings?.length ? (
-          results.standings.map((standing, index) => (
-            <div key={standing.showtimeId} className={`rounded-lg border p-4 ${index === 0 ? "border-green-400/20 bg-green-500/5" : "border-white/10 bg-white/5"}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm text-cyan-200">#{index + 1} / {standing.points} pts</p>
-                  <p className="mt-1 font-semibold text-white">{showtimeLabel(standing.showtime)}</p>
-                  <p className="mt-1 text-xs text-slate-400">{standing.firstChoiceVotes} first-choice votes / {standing.rankedVotes} total rankings</p>
-                </div>
-                {canConfirm ? (
-                  <Button size="sm" variant={index === 0 ? "outline" : "ghost"} onClick={() => onConfirm(standing.showtimeId)} disabled={isSaving} className="shrink-0 border-white/10 text-slate-100 hover:bg-white/10">
-                    {isChangingConfirmedShowtime ? "Change" : "Confirm"}
-                  </Button>
-                ) : null}
+        {canConfirm && !isChangingConfirmedShowtime ? <StatusAlert tone="info">Review the standings, then confirm the final showtime to open RSVP and ticket tracking.</StatusAlert> : null}
+        {!feedbackShowtimeId || !standings.some(standing => standing.showtimeId === feedbackShowtimeId) && !unranked.some(showtime => showtime.showtimeId === feedbackShowtimeId) ? feedback : null}
+        {standings.map((standing, index) => (
+          <div key={standing.showtimeId} className={`rounded-lg border p-4 ${index === 0 ? "border-green-400/25 bg-green-500/5" : "border-white/10"}`}>
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
+              <div className="min-w-0 break-words">
+                <p className="text-sm font-medium text-cyan-200">#{index + 1} · {standing.points} points{index === 0 ? " · Current leader" : ""}</p>
+                <p className="mt-1 font-semibold text-white">{showtimeLabel(standing.showtime)}</p>
+                <p className="mt-1 text-xs text-slate-300">{standing.firstChoiceVotes} first-choice votes · {standing.rankedVotes} total rankings</p>
               </div>
+              {canConfirm ? <Button size="sm" aria-label={`${isChangingConfirmedShowtime ? "Change to" : "Confirm"} ${showtimeLabel(standing.showtime)}`} onClick={() => onConfirm(standing.showtimeId)} disabled={isSaving} className="shrink-0 bg-violet-400 text-slate-950 hover:bg-violet-300">
+                {isSaving ? <Loader2 className="size-4 animate-spin" /> : null}{isChangingConfirmedShowtime ? "Choose showtime" : "Confirm"}
+              </Button> : null}
             </div>
-          ))
-        ) : (
-          <EmptyState
-            title="No votes yet"
-            description="Once members submit ballots, standings will show ranked-choice points and a confirm action for the final showtime."
-            className="bg-white/5"
-          />
-        )}
+            {feedbackShowtimeId === standing.showtimeId ? feedback : null}
+          </div>
+        ))}
+        {unranked.map(showtime => <div key={showtime.showtimeId} className="space-y-3 rounded-lg border border-white/10 p-4">
+          <p className="break-words font-medium text-white">{showtimeLabel(showtime)}</p>
+          <Button size="sm" disabled={isSaving} onClick={() => onConfirm(showtime.showtimeId)} aria-label={`Change to ${showtimeLabel(showtime)}`} className="bg-violet-400 text-slate-950 hover:bg-violet-300">{isSaving ? <Loader2 className="size-4 animate-spin" /> : null}Choose showtime</Button>
+          {feedbackShowtimeId === showtime.showtimeId ? feedback : null}
+        </div>)}
+        {!standings.length && !unranked.length ? <p className="text-sm text-slate-300">{isChangingConfirmedShowtime ? "No approved alternatives are available. Review showtimes before changing the plan." : "No ballots have been submitted yet."}</p> : null}
       </div>
     </AdminStepCard>
   );
 }
 
-function VotingControlCard({
-  movieNight,
-  showtimeCount,
-  voteCount,
-  isSaving,
-  votingClosesAt,
-  onVotingClosesAtChange,
-  onCloseVoting,
-  onOpenVoting,
-}: {
+function VotingControlCard({ movieNight, showtimeCount, voteCount, isSaving, votingClosesAt, onVotingClosesAtChange, onCloseVoting, onOpenVoting, onShowtimes, feedback }: {
   movieNight?: ActiveMovieNightResponse["movieNight"];
   showtimeCount: number;
   voteCount: number;
@@ -2294,66 +2297,62 @@ function VotingControlCard({
   onVotingClosesAtChange: (value: string) => void;
   onCloseVoting: () => void;
   onOpenVoting: () => void;
+  onShowtimes: () => void;
+  feedback?: React.ReactNode;
 }) {
   const status = movieNight?.status;
-  const votingOpen = status === "voting";
-  const votingClosed = Boolean(movieNight && isVotingClosed(movieNight));
-  const blocked = !movieNight || showtimeCount < 2;
-
+  const closed = Boolean(movieNight && isVotingClosed(movieNight));
+  const isPlanning = status === "planning";
+  const label = status === "voting" ? (closed ? "Voting closed" : "Voting open") : formatStatus(status);
+  const description = status === "confirmed" ? "The final plan is set. Voting is locked; members can RSVP and track tickets."
+    : status === "completed" ? "This movie night has ended. Voting and RSVP are closed."
+    : status === "cancelled" ? "This movie night was cancelled. Voting and RSVP are closed."
+    : status === "voting" ? (closed ? "Ballots are locked. Review the standings and confirm a showtime." : "Members can save and edit their rankings until the deadline.")
+    : movieNight ? "Approve at least two showtimes, then choose a deadline and open voting." : "Create a movie night before opening voting.";
   return (
-    <AdminStepCard
-      step="Voting"
-      title="Voting status"
-      description="Backend status controls whether member ballots are editable. This panel makes that state explicit for admins."
-      status={votingOpen && !votingClosed ? "current" : blocked ? "blocked" : "waiting"}
-    >
-      <div className="space-y-3">
-        <Metric label="Current state" value={formatStatus(status)} tone={statusTone(status)} />
-        <Metric label="Close time" value={movieNight?.votingClosesAt ? formatDate(movieNight.votingClosesAt) : "Not scheduled"} />
-        <Metric label="Ballots" value={`${voteCount} submitted`} />
-        {blocked ? (
-          <StatusAlert tone="warning">
-            Create the movie night and approve at least 2 showtimes before members can vote.
-          </StatusAlert>
-        ) : votingOpen && !votingClosed ? (
-          <>
-            <StatusAlert tone="info">Members can save and edit ranked ballots until the scheduled deadline.</StatusAlert>
-            <Button onClick={onCloseVoting} disabled={isSaving} variant="outline" className="w-full border-amber-300/30 text-amber-100 hover:bg-amber-400/10">
-              {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Clock className="size-4" />}Close voting early
-            </Button>
-          </>
-        ) : votingOpen && votingClosed ? (
-          <StatusAlert tone="success">Voting is closed. Review standings and confirm the final showtime.</StatusAlert>
-        ) : (
-          <>
-            <StatusAlert tone="warning">
-              Voting is not open yet. Only approved showtimes will appear on the member ballot.
-            </StatusAlert>
-            <Field label="Voting deadline" htmlFor="voting-deadline">
-              <Input id="voting-deadline" type="datetime-local" value={votingClosesAt} onChange={(event) => onVotingClosesAtChange(event.target.value)} className="border-white/10 bg-white/5 text-white" />
-            </Field>
-            <Button onClick={onOpenVoting} disabled={isSaving || !movieNight || showtimeCount < 2 || !votingClosesAt} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300">
-              {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}
-              Open voting
-            </Button>
-          </>
-        )}
+    <AdminStepCard title="Voting status" description={description} status={status === "voting" ? "current" : "waiting"}>
+      <div className="space-y-4">
+        <p className="font-medium text-cyan-200">{label}</p>
+        <dl className="space-y-2 text-sm text-slate-300">
+          {movieNight?.votingClosesAt ? <div><dt className="font-medium text-slate-200">Voting deadline</dt><dd className="mt-1 tabular-nums">{formatVotingDeadline(movieNight.votingClosesAt, movieNight.timezone)}</dd></div> : null}
+          {status !== "planning" && movieNight ? <div className="flex gap-2"><dt>Ballots submitted</dt><dd className="font-medium text-white">{voteCount}</dd></div> : null}
+        </dl>
+        {isPlanning && showtimeCount < 2 ? <div className="space-y-3"><StatusAlert tone="info">Approve at least two showtimes to give members a choice.</StatusAlert><Button type="button" variant="outline" onClick={onShowtimes}>Review showtimes</Button></div> : null}
+        {isPlanning && showtimeCount >= 2 ? <>
+          <Field label="Voting deadline" htmlFor="voting-deadline"><Input id="voting-deadline" type="datetime-local" value={votingClosesAt} onChange={event => onVotingClosesAtChange(event.target.value)} /></Field>
+          <p className="text-xs text-slate-300">Enter the deadline in your device timezone. The saved deadline is displayed in {movieNight?.timezone || "America/Chicago"}.</p>
+          <Button onClick={onOpenVoting} disabled={isSaving || !votingClosesAt} className="w-full bg-violet-400 text-slate-950 hover:bg-violet-300">{isSaving ? <Loader2 className="size-4 animate-spin" /> : <Vote className="size-4" />}Open voting</Button>
+        </> : null}
+        {status === "voting" && !closed ? <Button onClick={onCloseVoting} disabled={isSaving} variant="outline" className="w-full border-amber-300/30 text-amber-100 hover:bg-amber-400/10">{isSaving ? <Loader2 className="size-4 animate-spin" /> : <Clock className="size-4" />}Close voting early</Button> : null}
+        {feedback}
       </div>
     </AdminStepCard>
   );
 }
 
-function AttendanceSummaryCard({ status, attendance }: { status?: MovieNightStatus; attendance: AttendanceResponse | null }) {
-  const isConfirmed = status === "confirmed";
+function formatVotingDeadline(value: string, timezone = "America/Chicago") {
+  try {
+    return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(value)) + ` (${timezone})`;
+  } catch {
+    return `Deadline unavailable. Check the date and timezone in Setup.`;
+  }
+}
+
+function ActionFeedback({ feedback }: { feedback?: { error?: string | null; message?: string | null } }) {
+  if (!feedback?.error && !feedback?.message) return null;
+  return <StatusAlert tone={feedback.error ? "danger" : "success"} className="mt-3 break-words">{feedback.error || feedback.message}</StatusAlert>;
+}
+
+function AttendanceSummaryCard({ status, attendance, error }: { status?: MovieNightStatus; attendance: AttendanceResponse | null; error?: boolean }) {
+  const isConfirmed = status === "confirmed" || status === "completed";
 
   return (
     <AdminStepCard
-      step="Attendance"
       title="RSVP and tickets"
-      description="Member RSVP and ticket details appear after a final showtime is confirmed."
+      description={status === "completed" ? "Final RSVP and ticket responses for this movie night." : "Member responses to the confirmed plan."}
       status={isConfirmed ? "current" : "waiting"}
     >
-      {isConfirmed ? (
+      {isConfirmed && error ? <p className="text-sm text-slate-300">Attendance could not be loaded. Reload this page to try again.</p> : isConfirmed ? (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <MiniStat value={`${attendance?.summary.going ?? 0}`} label="going" tone="green" />
@@ -2438,7 +2437,7 @@ export function InviteList({
     <div className="space-y-3">
       {invites.map((invite) => (
         <div key={invite.inviteId} className="rounded-lg border border-white/10 bg-white/5 p-3">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <p className="truncate font-medium text-white">{invite.email || "Shareable link"}</p>
@@ -2455,7 +2454,7 @@ export function InviteList({
                     variant="ghost"
                     aria-label={`Share invite for ${invite.email || "this link"}`}
                     onClick={() => onShare(invite)}
-                    className="text-cyan-200 hover:bg-white/10"
+                    className="min-h-11 text-cyan-200 hover:bg-white/10"
                   >
                     <Share2 className="size-4" />
                     Share
@@ -2465,10 +2464,10 @@ export function InviteList({
                   type="button"
                   size="icon"
                   variant="ghost"
-                  title="Copy invite link"
+            title="Copy invite link"
                   aria-label={`Copy invite link for ${invite.email || "this link"}`}
                   onClick={() => onCopy(invite)}
-                  className="text-slate-200 hover:bg-white/10"
+                  className="size-11 text-slate-200 hover:bg-white/10"
                 >
                   {copiedInviteId === invite.inviteId ? <Check className="size-4 text-green-300" /> : <Copy className="size-4" />}
                 </Button>
@@ -2476,18 +2475,18 @@ export function InviteList({
                   type="button"
                   size="icon"
                   variant="ghost"
-                  title="Revoke invite"
+            title="Revoke invite"
                   aria-label={`Revoke invite for ${invite.email || "this link"}`}
                   onClick={() => onRevoke(invite)}
                   disabled={isRevoking}
-                  className="text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
+                  className="size-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
                 >
                   <Trash2 className="size-4" />
                 </Button>
               </div>
             ) : null}
           </div>
-          {invite.inviteUrl ? <p className="mt-2 truncate text-xs text-cyan-200">{invite.inviteUrl}</p> : null}
+          {invite.inviteUrl ? <p className="mt-2 break-all text-xs text-cyan-200">{invite.inviteUrl}</p> : null}
         </div>
       ))}
     </div>
@@ -2536,11 +2535,13 @@ function PreferenceBadge({ label, enabled }: { label: string; enabled: boolean }
   );
 }
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactElement<{ id?: string }> }) {
+  const generatedId = useId();
+  const id = htmlFor || children.props.id || generatedId;
   return (
     <div className="space-y-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
+      <Label htmlFor={id}>{label}</Label>
+      {cloneElement(children, { id })}
     </div>
   );
 }
@@ -2579,49 +2580,18 @@ function statusTone(status?: MovieNightStatus): MetricTone {
   return "default";
 }
 
-function getCompletedProgress({
-  hasMovieNight,
-  hasSelectedMovie,
-  showtimeCount,
-  status,
-  resultCount,
-}: {
-  hasMovieNight: boolean;
-  hasSelectedMovie: boolean;
-  showtimeCount: number;
-  status?: MovieNightStatus;
-  resultCount: number;
-}) {
-  if (status === "completed") {
-    return 6;
-  }
-  if (status === "confirmed") {
-    return 5;
-  }
-  if (resultCount || status === "voting") {
-    return resultCount ? 4 : 3;
-  }
-  if (showtimeCount) {
-    return 2;
-  }
-  if (hasMovieNight || hasSelectedMovie) {
-    return 1;
-  }
-  return 0;
-}
-
 function getNextAction({
   hasMovieNight,
   hasSelectedMovie,
   showtimeCount,
   status,
-  resultCount,
+  votingClosed,
 }: {
   hasMovieNight: boolean;
   hasSelectedMovie: boolean;
   showtimeCount: number;
   status?: MovieNightStatus;
-  resultCount: number;
+  votingClosed: boolean;
 }) {
   if (status === "completed") {
     return "This movie night is complete and available in club history.";
@@ -2629,17 +2599,15 @@ function getNextAction({
   if (status === "confirmed") {
     return "The final showtime is set. RSVP remains open until the showtime has passed.";
   }
-  if (resultCount) {
-    return "Voting results are ready. Review the current leader and confirm the final showtime.";
-  }
+  if (status === "cancelled") return "This movie night was cancelled. Create a new night when you are ready.";
   if (status === "voting") {
-    return "Voting is open. Monitor results as ballots come in, then confirm the winner.";
+    return votingClosed ? "Voting is closed. Review the standings and confirm the final showtime." : "Voting is open. Monitor ballots and wait for voting to close before confirming the plan.";
   }
   if (showtimeCount) {
     return "Candidate showtimes are imported. Members can rank the available options once voting is open.";
   }
   if (hasMovieNight) {
-    return "Movie night created. Refresh or search cached showtimes, then import the best options for voting.";
+    return "Movie night created. Refresh or search available showtimes, then import the best options for voting.";
   }
   if (hasSelectedMovie) {
     return "Movie selected. Set the target date and create the movie night to unlock showtime import.";

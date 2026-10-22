@@ -249,3 +249,15 @@ button:not(:disabled):active, a:active { transform: translateY(1px); }
 /* Event pages include a persistent return row beneath the main header. */
 html:has(nav[aria-label="Movie night navigation"]) { scroll-padding-top: 8rem; }
 html:has(nav[aria-label="Movie night navigation"]) main :is(a, button, input, summary, [tabindex]) { scroll-margin-top: 8rem; }
+
+/* Keep admin controls clear of the persistent navigation and review actions. */
+html:has(main .mc-admin-page) { scroll-padding-top: 11rem; scroll-padding-bottom: calc(6rem + env(safe-area-inset-bottom)); }
+.mc-admin-page { overflow-wrap: anywhere; }
+.mc-admin-page :is(button, input, select, summary) { min-height: 2.75rem; }
+html:has(.mc-admin-page) .mc-admin-page :is(a, button, input, select, textarea, summary, [tabindex]) { scroll-margin-top: 11rem; scroll-margin-bottom: calc(6rem + env(safe-area-inset-bottom)); }
+.mc-admin-page:has([aria-label="Showtime review actions"]) :is(button, select) { scroll-margin-bottom: calc(17rem + env(safe-area-inset-bottom)); }
+@media (min-width: 1024px) {
+  html:has(main .mc-admin-page) { scroll-padding-top: 8rem; scroll-padding-bottom: 2rem; }
+  html:has(.mc-admin-page) .mc-admin-page :is(a, button, input, select, textarea, summary, [tabindex]) { scroll-margin-top: 8rem; scroll-margin-bottom: 2rem; }
+  .mc-admin-page:has([aria-label="Showtime review actions"]) :is(button, select) { scroll-margin-bottom: 10rem; }
+}

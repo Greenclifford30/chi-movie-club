@@ -32,7 +32,7 @@ describe("invite navigation", () => {
     render(<InvitePage />);
     await screen.findByRole("heading", { name: "Join Friday Films" });
     const redirect = encodeURIComponent("/invites/invite%2Ftoken");
-    expect(screen.getByRole("link", { name: "Sign in", exact: true })).toHaveAttribute("href", `/sign-in?redirect=${redirect}`);
-    expect(screen.getByRole("link", { name: "Sign up", exact: true })).toHaveAttribute("href", `/sign-up?redirect=${redirect}`);
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", `/sign-in?redirect=${redirect}`);
+    expect(screen.getByRole("link", { name: "Sign up" })).toHaveAttribute("href", `/sign-up?redirect=${redirect}`);
   });
 });

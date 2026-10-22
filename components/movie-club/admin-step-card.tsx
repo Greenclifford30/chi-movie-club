@@ -11,7 +11,7 @@ export function AdminStepCard({
   children,
   className = "",
 }: {
-  step: string;
+  step?: string;
   title: string;
   description: string;
   status?: "current" | "complete" | "waiting" | "blocked";
@@ -30,8 +30,8 @@ export function AdminStepCard({
       <CardHeader className="gap-3">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-violet-300">{step}</p>
-            <h2 className="mt-2 text-xl font-semibold text-white">{title}</h2>
+            {step ? <p className="text-xs font-medium uppercase tracking-wide text-violet-300">{step}</p> : null}
+            <h2 className={`${step ? "mt-2 " : ""}text-xl font-semibold text-white`}>{title}</h2>
             <p className="mt-1 text-sm text-slate-400">{description}</p>
           </div>
           {status === "complete" ? <CheckCircle2 className="size-5 shrink-0 text-green-300" /> : null}
