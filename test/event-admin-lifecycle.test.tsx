@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EventAdmin from "@/app/clubs/[clubId]/admin/admin-client";
-import { cancelMovieNight, completeMovieNight, getMovieNight, getVoteResults, listClubInvites, listMovieNights, confirmShowtime, approveBulkShowtimeCandidates, approveShowtimeCandidate, MovieClubApiError } from "@/lib/movie-club-api";
+import { cancelMovieNight, completeMovieNight, getMovieNight, getVoteResults, discoverMovies, listClubInvites, listMovieNights, confirmShowtime, approveBulkShowtimeCandidates, approveShowtimeCandidate, MovieClubApiError } from "@/lib/movie-club-api";
 import type { ActiveMovieNightResponse, MovieNightStatus } from "@/lib/movie-club-types";
 
 const navigation = vi.hoisted(() => ({ params: { clubId: "club", movieNightId: "night" } as { clubId: string; movieNightId?: string }, push: vi.fn(), replace: vi.fn() }));
@@ -362,5 +362,51 @@ describe("showtime review recovery", () => {
     expect(alert).toHaveTextContent("Approval failed. Try again.");
     expect(approve.closest(".rounded-lg")).toContainElement(alert);
     expect(within(panel).getByLabelText("Status")).toHaveValue("imported");
+  });
+});
+
+
+describe("release-aware planning dates", () => {
+  it("fills missing dates from the film release date", async () => {
+    const fixture = night("planning");
+    fixture.movieNight.targetDate = undefined;
+    fixture.movieNight.movie.releaseDate = "2099-12-18";
+    vi.mocked(getMovieNight).mockResolvedValue(fixture);
+    render(<EventAdmin />);
+    const panel = await openTab(/Setup/);
+    expect(within(panel).getAllByLabelText("Target date").every(input => (input as HTMLInputElement).value === "2099-12-18")).toBe(true);
+    expect(within(panel).getByLabelText("Window start")).toHaveValue("2099-12-18");
+    expect(within(panel).getByLabelText("Window end")).toHaveValue("2099-12-18");
+  });
+
+  it("preserves existing saved dates", async () => {
+    const fixture = withShowtimes();
+    fixture.movieNight.movie.releaseDate = "2098-12-18";
+    vi.mocked(getMovieNight).mockResolvedValue(fixture);
+    render(<EventAdmin />);
+    const panel = await openTab(/Setup/);
+    expect(within(panel).getByLabelText("Window start")).toHaveValue("2099-01-01");
+    expect(within(panel).getByLabelText("Window end")).toHaveValue("2099-01-01");
+  });
+
+  it("updates defaults when switching films and retains a later custom window", async () => {
+    navigation.params.movieNightId = undefined;
+    vi.mocked(discoverMovies).mockResolvedValue({ results: [
+      { externalProvider: "tmdb", externalMovieId: "future", title: "Upcoming film", status: "coming_soon", releaseDate: "2099-12-18" },
+      { externalProvider: "tmdb", externalMovieId: "released", title: "Released film", status: "now_playing", releaseDate: "2016-11-11" },
+    ] });
+    render(<EventAdmin />);
+    const panel = await openTab(/Setup/);
+    fireEvent.click(await within(panel).findByRole("button", { name: /Upcoming film/ }));
+    expect(within(panel).getByLabelText("Window start")).toHaveValue("2099-12-18");
+    fireEvent.click(within(panel).getByRole("button", { name: /Released film/ }));
+    const today = new Date();
+    const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    expect(within(panel).getByLabelText("Window start")).toHaveValue(day);
+    fireEvent.change(within(panel).getByLabelText("Window end"), { target: { value: "2099-12-25" } });
+    fireEvent.click(within(panel).getByRole("button", { name: /Upcoming film/ }));
+    expect(within(panel).getByLabelText("Window start")).toHaveValue("2099-12-18");
+    expect(within(panel).getByLabelText("Window end")).toHaveValue("2099-12-25");
+    expect(within(panel).getAllByLabelText("Target date").every(input => (input as HTMLInputElement).value === "2099-12-18")).toBe(true);
   });
 });

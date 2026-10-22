@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/movie-club/empty-state";
 import { PageSkeleton } from "@/components/movie-club/page-skeleton";
 import { StatusAlert } from "@/components/movie-club/status-alert";
 import { DEFAULT_PLANNING_RADIUS, DEFAULT_PLANNING_ZIP, PlanningPreferencesFields, validatePlanningLocation } from "@/components/movie-club/planning-preferences-fields";
-import { localDateValue, validatePlanningWindow } from "@/lib/movie-club-planning";
+import { localDateValue, moviePlanningDates, validatePlanningWindow } from "@/lib/movie-club-planning";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -286,7 +286,7 @@ function ProposalControls({ proposal, token, clubId, isAdmin, onChanged, onSched
   const [reason, setReason] = useState(proposal.reason || "");
   const [moderationReason, setModerationReason] = useState("");
   const today = localDateValue();
-  const [planning, setPlanning] = useState<MovieNightPlanningInput>({ targetDate: today, dateWindowStart: today, dateWindowEnd: today, zipCode: DEFAULT_PLANNING_ZIP, radiusMiles: DEFAULT_PLANNING_RADIUS, timezone: "America/Chicago", preferredFormats: [], preferredTheaterIds: [] });
+  const [planning, setPlanning] = useState<MovieNightPlanningInput>(() => ({ ...moviePlanningDates(proposal.movie.releaseDate, today), zipCode: DEFAULT_PLANNING_ZIP, radiusMiles: DEFAULT_PLANNING_RADIUS, timezone: "America/Chicago", preferredFormats: [], preferredTheaterIds: [] }));
   const retries = useRef(new Map<string, string>());
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);

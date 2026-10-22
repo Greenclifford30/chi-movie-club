@@ -7,6 +7,14 @@ export function localDateValue(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+export function moviePlanningDates(releaseDate?: string, today = localDateValue()) {
+  const releaseDay = releaseDate?.slice(0, 10) || "";
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(releaseDay) ? new Date(`${releaseDay}T00:00:00Z`) : null;
+  const validRelease = parsed && Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === releaseDay;
+  const date = validRelease && releaseDay > today ? releaseDay : today;
+  return { targetDate: date, dateWindowStart: date, dateWindowEnd: date };
+}
+
 export function validatePlanningWindow(
   planning: Pick<MovieNightPlanningInput, "targetDate" | "dateWindowStart" | "dateWindowEnd">,
   today = localDateValue()

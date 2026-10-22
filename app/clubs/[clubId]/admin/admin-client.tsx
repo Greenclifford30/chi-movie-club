@@ -72,7 +72,7 @@ import {
 } from "@/lib/movie-club-api";
 import { formatDate, formatTime, posterUrl, showtimeDateTime, showtimeLabel } from "@/lib/movie-club-format";
 import { movieNightConflicts } from "@/lib/movie-night-conflicts";
-import { localDateValue, validatePlanningWindow } from "@/lib/movie-club-planning";
+import { localDateValue, moviePlanningDates, validatePlanningWindow } from "@/lib/movie-club-planning";
 import type { ActiveMovieNightResponse, AttendanceResponse, CachedShowtime, ClubInvite, ClubMembership, MovieDiscoveryResult, MovieNightPlanningInput, MovieNightStatus, MovieSnapshot, Showtime, VoteResults } from "@/lib/movie-club-types";
 
 type ActionState = "idle" | "saving" | "saved" | "error";
@@ -220,11 +220,13 @@ export default function ClubAdminPage() {
         return;
       }
       setSelectedMovie(nextActive.movieNight.movie);
-      setTargetDate(nextActive.movieNight.targetDate || today);
+      const defaultDates = moviePlanningDates(nextActive.movieNight.movie.releaseDate, today);
+      const nextTargetDate = nextActive.movieNight.targetDate || defaultDates.targetDate;
+      setTargetDate(nextTargetDate);
       setPlanningForm({
-        targetDate: nextActive.movieNight.targetDate || today,
-        dateWindowStart: nextActive.movieNight.dateWindowStart || nextActive.movieNight.targetDate || today,
-        dateWindowEnd: nextActive.movieNight.dateWindowEnd || nextActive.movieNight.targetDate || today,
+        targetDate: nextTargetDate,
+        dateWindowStart: nextActive.movieNight.dateWindowStart || nextTargetDate,
+        dateWindowEnd: nextActive.movieNight.dateWindowEnd || nextTargetDate,
         zipCode: nextActive.movieNight.zipCode || DEFAULT_PLANNING_ZIP,
         radiusMiles: nextActive.movieNight.radiusMiles || DEFAULT_PLANNING_RADIUS,
         timezone: nextActive.movieNight.timezone || "America/Chicago",
@@ -232,7 +234,7 @@ export default function ClubAdminPage() {
         preferredTheaterIds: nextActive.movieNight.preferredTheaterIds || [],
       });
       setUsesAccountDefaults(false);
-      setVotingClosesAt(nextActive.movieNight.votingClosesAt ? toLocalDateTimeInput(nextActive.movieNight.votingClosesAt) : defaultVotingDeadline(nextActive.movieNight.targetDate || today));
+      setVotingClosesAt(nextActive.movieNight.votingClosesAt ? toLocalDateTimeInput(nextActive.movieNight.votingClosesAt) : defaultVotingDeadline(nextTargetDate));
       if (
         nextActive.showtimes.length &&
         (nextActive.movieNight.status === "voting" || nextActive.movieNight.status === "confirmed")
@@ -842,16 +844,17 @@ export default function ClubAdminPage() {
 
   function handleSelectMovie(movie: MovieSnapshot) {
     setSelectedMovie(movie);
-    if (!movie.releaseDate || movie.releaseDate < today) {
-      return;
-    }
-    setTargetDate(movie.releaseDate);
-    setPlanningForm((current) => ({
-      ...current,
-      targetDate: movie.releaseDate!,
-      dateWindowStart: movie.releaseDate!,
-      dateWindowEnd: movie.releaseDate!,
-    }));
+    if (selectedMovie?.provider === movie.provider && selectedMovie.externalId === movie.externalId) return;
+    const defaults = moviePlanningDates(movie.releaseDate, today);
+    const previousDefaults = moviePlanningDates(selectedMovie?.releaseDate, today);
+    const dateFields = ["targetDate", "dateWindowStart", "dateWindowEnd"] as const;
+    const usingDefaults = dateFields.every(field => planningForm[field] === previousDefaults[field]);
+    // Refresh untouched defaults for a different film; retain custom dates that still fit.
+    const nextStart = usingDefaults ? defaults.dateWindowStart : [planningForm.dateWindowStart, defaults.dateWindowStart].sort().at(-1)!;
+    const nextTarget = usingDefaults ? defaults.targetDate : [planningForm.targetDate, nextStart].sort().at(-1)!;
+    const nextEnd = usingDefaults ? defaults.dateWindowEnd : [planningForm.dateWindowEnd, nextTarget].sort().at(-1)!;
+    setTargetDate(nextTarget);
+    setPlanningForm(current => ({ ...current, targetDate: nextTarget, dateWindowStart: nextStart, dateWindowEnd: nextEnd }));
   }
 
   async function handleCreateShareableInvite() {

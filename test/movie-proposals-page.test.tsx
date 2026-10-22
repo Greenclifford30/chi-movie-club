@@ -107,3 +107,28 @@ describe("film proposal controls", () => {
     expect(await screen.findByText("Thief")).toBeInTheDocument();
   });
 });
+
+
+describe("release-aware suggestion scheduling", () => {
+  it("prefills and submits the movie release date instead of today", async () => {
+    vi.mocked(api.listMovieProposals).mockResolvedValue({ proposals: [{ ...proposal, movie: { ...proposal.movie, releaseDate: "2099-12-18" } }] });
+    vi.mocked(api.scheduleMovieProposal).mockResolvedValue({ proposal, movieNight: { clubId: "club", movieNightId: "night", status: "planning", movie: proposal.movie } });
+    render(<ClubSuggestionsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Schedule movie night" }));
+    for (const label of ["Target date", "Window start", "Window end"]) expect(screen.getByLabelText(label)).toHaveValue("2099-12-18");
+    fireEvent.click(screen.getByRole("button", { name: "Create linked movie night" }));
+    await waitFor(() => expect(api.scheduleMovieProposal).toHaveBeenCalledWith("token", "club", "p1", expect.objectContaining({ targetDate: "2099-12-18", dateWindowStart: "2099-12-18", dateWindowEnd: "2099-12-18" })));
+  });
+
+  it("preserves custom scheduling dates when closing and reopening the form", async () => {
+    vi.mocked(api.listMovieProposals).mockResolvedValue({ proposals: [{ ...proposal, movie: { ...proposal.movie, releaseDate: "2099-12-18" } }] });
+    render(<ClubSuggestionsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Schedule movie night" }));
+    fireEvent.change(screen.getByLabelText("Target date"), { target: { value: "2099-12-22" } });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Schedule movie night" }));
+    expect(screen.getByLabelText("Target date")).toHaveValue("2099-12-22");
+    expect(screen.getByLabelText("Window start")).toHaveValue("2099-12-22");
+    expect(screen.getByLabelText("Window end")).toHaveValue("2099-12-22");
+  });
+});
