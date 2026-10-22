@@ -22,6 +22,13 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe("film proposal controls", () => {
+  it("shows the full release date when a release year is also present", async () => {
+    vi.mocked(api.listMovieProposals).mockResolvedValue({ proposals: [{ ...proposal, movie: { ...proposal.movie, releaseDate: "2026-12-18", releaseYear: "2026" } }] });
+    render(<ClubSuggestionsPage />);
+    const date = await screen.findByText("Dec 18, 2026");
+    expect(date).toHaveAttribute("datetime", "2026-12-18");
+    expect(screen.getByText(/Suggested by Member/)).toBeInTheDocument();
+  });
   it("edits an author's reason with its version", async () => {
     vi.mocked(api.updateMovieProposal).mockResolvedValue({ proposal: { ...proposal, reason: "Updated", version: 4 } });
     render(<ClubSuggestionsPage />);
@@ -74,8 +81,8 @@ describe("film proposal controls", () => {
     await waitFor(() => expect(api.listMovieProposals).toHaveBeenLastCalledWith("token", "club", "scheduled"));
     fireEvent.change(screen.getByLabelText("Search movie titles"), { target: { value: "Heat" } });
     fireEvent.click(screen.getByRole("button", { name: "Search movies" }));
-    await screen.findByRole("button", { name: /Heat.*Year unknown/ });
-    fireEvent.click(screen.getByRole("button", { name: /Heat.*Year unknown/ }));
+    await screen.findByRole("button", { name: /Heat.*Release date TBD/ });
+    fireEvent.click(screen.getByRole("button", { name: /Heat.*Release date TBD/ }));
     fireEvent.click(screen.getByRole("button", { name: "Suggest film" }));
     expect(await screen.findByRole("link", { name: "View the existing suggestion" })).toHaveAttribute("href", "#proposal-p2");
     expect(await screen.findByText("Thief")).toBeInTheDocument();

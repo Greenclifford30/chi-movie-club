@@ -198,7 +198,7 @@ export default function ClubSuggestionsPage() {
                   const active = selectedMovie?.provider === movie.provider && selectedMovie.externalId === movie.externalId;
                   return <button key={`${movie.provider}-${movie.externalId}`} type="button" onClick={() => setSelectedMovie(movie)} className={`flex w-full items-center gap-3 rounded-lg border p-2 text-left transition ${active ? "border-cyan-300/50 bg-cyan-400/10" : "border-white/10 bg-white/[.03] hover:bg-white/[.07]"}`}>
                     <Poster movie={movie} />
-                    <span className="min-w-0 flex-1"><span className="block truncate font-medium text-white">{movie.title}</span><span className="text-xs text-slate-400">{movie.releaseYear || movie.releaseDate?.slice(0, 4) || "Year unknown"}</span></span>
+                    <span className="min-w-0 flex-1"><span className="block truncate font-medium text-white">{movie.title}</span><span className="text-xs text-slate-400"><ReleaseDate movie={movie} /></span></span>
                     {active ? <Check className="size-4 text-cyan-200" /> : null}
                   </button>;
                 })}
@@ -238,7 +238,7 @@ function ProposalCard({ proposal, working, onEndorse, onWithdraw, controls }: { 
         <Poster movie={proposal.movie} large />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <div><h3 className="font-semibold text-white">{proposal.movie.title}</h3><p className="mt-1 text-xs text-slate-400">{proposal.movie.releaseYear || proposal.movie.releaseDate?.slice(0, 4) || "Release year unknown"}{proposal.proposerName ? ` · Suggested by ${proposal.proposerName}` : ""}</p></div>
+            <div><h3 className="font-semibold text-white">{proposal.movie.title}</h3><p className="mt-1 text-xs text-slate-400"><ReleaseDate movie={proposal.movie} />{proposal.proposerName ? ` · Suggested by ${proposal.proposerName}` : ""}</p></div>
             {proposal.createdAt ? <span className="text-xs text-slate-500">{formatDate(proposal.createdAt)}</span> : null}
           </div>
           {proposal.reason ? <p className="mt-3 text-sm leading-6 text-slate-300">{proposal.reason}</p> : null}
@@ -256,6 +256,13 @@ function ProposalCard({ proposal, working, onEndorse, onWithdraw, controls }: { 
       {controls}
     </CardContent>
   </Card>;
+}
+
+function ReleaseDate({ movie }: { movie: MovieSnapshot }) {
+  if (movie.releaseDate) {
+    return <>Release date: <time dateTime={movie.releaseDate}>{formatDate(movie.releaseDate, "MMM d, yyyy")}</time></>;
+  }
+  return <>{movie.releaseYear ? `${movie.releaseYear} · ` : ""}Release date TBD</>;
 }
 
 function Poster({ movie, large = false }: { movie: MovieSnapshot; large?: boolean }) {
